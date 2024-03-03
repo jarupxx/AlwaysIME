@@ -185,7 +185,9 @@ class ResidentTest : Form
         if (!GetGUIThreadInfo(0, ref gti))
         {
             Console.WriteLine("GetGUIThreadInfo failed");
-            throw new System.ComponentModel.Win32Exception();
+            // ロック解除時に例外0x80004005が発生する
+            // throw new System.ComponentModel.Win32Exception();
+            return;
         }
 
         IntPtr imwd = ImmGetDefaultIMEWnd(gti.hwndFocus);
