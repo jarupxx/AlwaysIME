@@ -113,7 +113,7 @@ class ResidentTest : Form
         }
         else
         {
-            throw new Exception("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
         }
         try
         {
@@ -121,7 +121,7 @@ class ResidentTest : Form
         }
         catch (Exception)
         {
-            throw new Exception("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
         }
     }
 
@@ -129,7 +129,6 @@ class ResidentTest : Form
     {
         Application.Exit();
     }
-
     private void setComponents()
     {
         NotifyIcon icon = new NotifyIcon();
