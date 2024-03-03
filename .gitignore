@@ -13,6 +13,7 @@
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
+Visual Studio 2022
 
 # Mono auto generated files
 mono_crash.*
