@@ -196,7 +196,9 @@ class ResidentTest : Form
         int imeConvMode = SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETCONVERSIONMODE, IntPtr.Zero);
         bool imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
 
+        #if DEBUG
         Console.WriteLine(imeEnabled.ToString() + " status code:" + imeConvMode.ToString());
+        #endif
 
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
@@ -204,7 +206,9 @@ class ResidentTest : Form
         var buff = new System.Text.StringBuilder(nChars);
         if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
         {
+            #if DEBUG
             Console.WriteLine("ウィンドウのタイトル: " + buff.ToString());
+            #endif
             foregroundWindowTitle = buff.ToString();
         }
         // プロセスIDを取得
@@ -223,12 +227,16 @@ class ResidentTest : Form
         {
             if (processName == appArray[i])
             {
+                #if DEBUG
                 Console.WriteLine($"{processName} はAppListに含まれています。");
+                #endif
                 return;
             }
         }
         }
+        #if DEBUG
         Console.WriteLine("プロセス名: " + processName);
+        #endif
         if (foregroundWindowTitle != previousWindowTitle)
         {
             if (previousimeEnabled)
