@@ -24,6 +24,7 @@ class MainWindow
         if (createdNew)
         {
             ResidentTest rm = new ResidentTest();
+            rm.InitializeAppArray();
             Application.Run();
             mutex.ReleaseMutex();
         }
@@ -37,6 +38,8 @@ class ResidentTest : Form
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     private string foregroundWindowTitle;
+    private string[] appArray;
+    private int imeInterval = 1000;
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -96,21 +99,30 @@ class ResidentTest : Form
         this.ShowInTaskbar = false;
         this.setComponents();
         this.timer = new System.Windows.Forms.Timer();
+        this.timer.Interval = imeInterval;
+        this.timer.Tick += new EventHandler(Timer_Tick);
+        this.timer.Start();
+    }
 
-        // AlwaysIME.exe.config ファイルから imeInterval の値を読み込む
-        int imeInterval = 1000;
+    public void InitializeAppArray()
+    {
+        string appList = ConfigurationManager.AppSettings["AppList"];
+        if (!string.IsNullOrEmpty(appList))
+        {
+            appArray = appList.Split(',');
+        }
+        else
+        {
+            throw new Exception("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
         try
         {
             imeInterval = int.Parse(ConfigurationManager.AppSettings["intervalTime"]);
         }
         catch (Exception)
         {
-            MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
-            Application.Exit();
+            throw new Exception("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
         }
-        this.timer.Interval = imeInterval;
-        this.timer.Tick += new EventHandler(Timer_Tick);
-        this.timer.Start();
     }
 
     private void Close_Click(object sender, EventArgs e)
@@ -135,7 +147,8 @@ class ResidentTest : Form
         menu.Items.Add(menuItem500);
         ToolStripMenuItem menuItem1000 = new ToolStripMenuItem();
         menuItem1000.Text = "> 1000 ms";
-        menuItem1000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(1000)); menu.Items.Add(menuItem1000);
+        menuItem1000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(1000));
+        menu.Items.Add(menuItem1000);
         ToolStripMenuItem menuItem2000 = new ToolStripMenuItem();
         menuItem2000.Text = "> 2000 ms";
         menuItem2000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(2000));
@@ -202,9 +215,8 @@ class ResidentTest : Form
         Process[] processes = Process.GetProcessesByName(processName);
         // プロセス名を取得
         Process[] array = Process.GetProcesses();
-        // app.config から区切りのアプリのリストを読み込む
-        string appList = ConfigurationManager.AppSettings["AppList"];
-        string[] appArray = appList.Split(',');
+        if (appArray != null)
+        {
         for (int i = 0; i < appArray.Length; i++)
         {
             if (processName == appArray[i])
@@ -212,6 +224,7 @@ class ResidentTest : Form
                 Console.WriteLine($"{processName} はAppListに含まれています。");
                 return;
             }
+        }
         }
         Console.WriteLine("プロセス名: " + processName);
         if (foregroundWindowTitle != previousWindowTitle)
