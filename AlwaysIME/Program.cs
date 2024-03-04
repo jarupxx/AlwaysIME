@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows;
 using System.Windows.Forms;
 
 /*
@@ -25,7 +26,7 @@ class MainWindow
         {
             ResidentTest rm = new ResidentTest();
             rm.InitializeAppArray();
-            Application.Run();
+            System.Windows.Forms.Application.Run();
             mutex.ReleaseMutex();
         }
     }
@@ -113,7 +114,7 @@ class ResidentTest : Form
         }
         else
         {
-            MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
         }
         try
         {
@@ -121,18 +122,22 @@ class ResidentTest : Form
         }
         catch (Exception)
         {
-            MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
         }
     }
 
     private void Close_Click(object sender, EventArgs e)
     {
-        Application.Exit();
+        System.Windows.Forms.Application.Exit();
     }
     private void setComponents()
     {
+        float dpiX;
+        using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
+        dpiX = graphics.DpiX;
         NotifyIcon icon = new NotifyIcon();
-        icon.Icon = new Icon("app.ico");
+        icon.Icon = new Icon("app.ico", (int)(SystemParameters.SmallIconWidth * dpiX / 96),
+                                        (int)(SystemParameters.SmallIconHeight * dpiX / 96));
         icon.Visible = true;
         icon.Text = "AlwaysIME";
         ContextMenuStrip menu = new ContextMenuStrip();
@@ -195,9 +200,9 @@ class ResidentTest : Form
         int imeConvMode = SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETCONVERSIONMODE, IntPtr.Zero);
         bool imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
 
-        #if DEBUG
+#if DEBUG
         Console.WriteLine(imeEnabled.ToString() + " status code:" + imeConvMode.ToString());
-        #endif
+#endif
 
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
@@ -205,9 +210,9 @@ class ResidentTest : Form
         var buff = new System.Text.StringBuilder(nChars);
         if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
         {
-            #if DEBUG
+#if DEBUG
             Console.WriteLine("ウィンドウのタイトル: " + buff.ToString());
-            #endif
+#endif
             foregroundWindowTitle = buff.ToString();
         }
         // プロセスIDを取得
@@ -222,20 +227,20 @@ class ResidentTest : Form
         Process[] array = Process.GetProcesses();
         if (appArray != null)
         {
-        for (int i = 0; i < appArray.Length; i++)
-        {
-            if (processName == appArray[i])
+            for (int i = 0; i < appArray.Length; i++)
             {
-                #if DEBUG
+                if (processName == appArray[i])
+                {
+#if DEBUG
                 Console.WriteLine($"{processName} はAppListに含まれています。");
-                #endif
-                return;
+#endif
+                    return;
+                }
             }
         }
-        }
-        #if DEBUG
+#if DEBUG
         Console.WriteLine("プロセス名: " + processName);
-        #endif
+#endif
         if (foregroundWindowTitle != previousWindowTitle)
         {
             if (previousimeEnabled)
