@@ -136,7 +136,7 @@ class ResidentTest : Form
     {
         float dpiX;
         using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
-        dpiX = graphics.DpiX;
+            dpiX = graphics.DpiX;
         NotifyIcon icon = new NotifyIcon();
         icon.Icon = new Icon("app.ico", (int)(SystemParameters.SmallIconWidth * dpiX / 96),
                                         (int)(SystemParameters.SmallIconHeight * dpiX / 96));
@@ -234,7 +234,7 @@ class ResidentTest : Form
                 if (processName == appArray[i])
                 {
 #if DEBUG
-                Console.WriteLine($"{processName} はAppListに含まれています。");
+                    Console.WriteLine($"{processName} はAppListに含まれています。");
 #endif
                     return;
                 }
