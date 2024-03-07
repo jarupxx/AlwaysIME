@@ -231,7 +231,7 @@ class ResidentTest : Form
         {
             for (int i = 0; i < appArray.Length; i++)
             {
-                if (processName == appArray[i])
+                if (processName.ToLower() == appArray[i].ToLower())
                 {
 #if DEBUG
                     Console.WriteLine($"{processName} はAppListに含まれています。");
