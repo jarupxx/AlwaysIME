@@ -243,6 +243,18 @@ class ResidentTest : Form
 #if DEBUG
         Console.WriteLine("プロセス名: " + processName);
 #endif
+        if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
+        {
+#if DEBUG
+            Console.WriteLine("ウィンドウのタイトル: " + buff.ToString());
+#endif
+            foregroundWindowTitle = buff.ToString();
+        }
+        else
+        {
+            Console.WriteLine("ウィンドウのタイトル: が取得できません。" + buff.ToString());
+            return;
+        }
         if (foregroundWindowTitle != previousWindowTitle)
         {
             if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
