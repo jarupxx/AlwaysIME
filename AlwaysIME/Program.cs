@@ -80,6 +80,7 @@ class ResidentTest : Form
     const int IMC_GETOPENSTATUS = 5;
     const int IMC_SETOPENSTATUS = 6;
 
+    const int IME_CMODE_DISABLED = 0;
     const int IME_CMODE_NATIVE = 1;
     const int IME_CMODE_KATAKANA = 2;
     const int IME_CMODE_FULLSHAPE = 8;
@@ -90,6 +91,7 @@ class ResidentTest : Form
     const int CMode_Hiragana = IME_CMODE_ROMAN | IME_CMODE_FULLSHAPE | IME_CMODE_NATIVE;
     const int CMode_ZenkakuKana = IME_CMODE_ROMAN | IME_CMODE_FULLSHAPE | IME_CMODE_KATAKANA | IME_CMODE_NATIVE;
     // 実験してみた結果
+    // 00 :× IMEが無効です                0000 0000
     // 19 :カ 半角カナ                     0001 0011
     // 24 :Ａ 全角英数                     0001 1000
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
@@ -243,7 +245,12 @@ class ResidentTest : Form
 #endif
         if (foregroundWindowTitle != previousWindowTitle)
         {
-            if (previousimeEnabled)
+            if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
+            {
+                Console.WriteLine("IMEが無効です");
+                changeIme = false;
+            }
+            else if (previousimeEnabled)
             {
                 SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
                 imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
