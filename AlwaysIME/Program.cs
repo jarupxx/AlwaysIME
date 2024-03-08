@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Configuration;
 using System.Diagnostics;
 using System.Drawing;
@@ -205,18 +205,17 @@ class ResidentTest : Form
 #if DEBUG
         Console.WriteLine(imeEnabled.ToString() + " status code:" + imeConvMode.ToString());
 #endif
+        if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
+        {
+            Console.WriteLine("IMEが無効です");
+            changeIme = false;
+            return;
+        }
 
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
         const int nChars = 256;
         var buff = new System.Text.StringBuilder(nChars);
-        if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
-        {
-#if DEBUG
-            Console.WriteLine("ウィンドウのタイトル: " + buff.ToString());
-#endif
-            foregroundWindowTitle = buff.ToString();
-        }
         // プロセスIDを取得
         uint processId;
         GetWindowThreadProcessId(foregroundWindowHandle, out processId);
@@ -227,6 +226,21 @@ class ResidentTest : Form
         Process[] processes = Process.GetProcessesByName(processName);
         // プロセス名を取得
         Process[] array = Process.GetProcesses();
+
+        if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
+        {
+#if DEBUG
+            Console.WriteLine("ウィンドウのタイトル: " + buff.ToString());
+            Console.WriteLine("プロセス名: " + processName);
+#endif
+            foregroundWindowTitle = buff.ToString();
+        }
+        else
+        {
+            Console.WriteLine("ウィンドウのタイトル: が取得できません。" + buff.ToString());
+            Console.WriteLine("プロセス名: " + processName);
+            return;
+        }
         if (appArray != null)
         {
             for (int i = 0; i < appArray.Length; i++)
@@ -240,29 +254,9 @@ class ResidentTest : Form
                 }
             }
         }
-#if DEBUG
-        Console.WriteLine("プロセス名: " + processName);
-#endif
-        if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
-        {
-#if DEBUG
-            Console.WriteLine("ウィンドウのタイトル: " + buff.ToString());
-#endif
-            foregroundWindowTitle = buff.ToString();
-        }
-        else
-        {
-            Console.WriteLine("ウィンドウのタイトル: が取得できません。" + buff.ToString());
-            return;
-        }
         if (foregroundWindowTitle != previousWindowTitle)
         {
-            if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
-            {
-                Console.WriteLine("IMEが無効です");
-                changeIme = false;
-            }
-            else if (previousimeEnabled)
+            if (previousimeEnabled)
             {
                 SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
                 imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
