@@ -22,14 +22,5 @@ namespace AlwaysIME.Properties {
                 return defaultInstance;
             }
         }
-        
-        [global::System.Configuration.ApplicationScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("2000")]
-        public string Interval {
-            get {
-                return ((string)(this["Interval"]));
-            }
-        }
     }
 }

@@ -11,7 +11,7 @@ using System.Windows.Forms;
  参考
  C#でIMEの変換モードを監視・変更する #C# - Qiita
  https://qiita.com/kob58im/items/a1644b36366f4d094a2c
- C#: タスクトレイに常駐するアプリの作り方 
+ C#: タスクトレイに常駐するアプリの作り方
  https://pineplanter.moo.jp/non-it-salaryman/2017/06/01/c-sharp-tasktray/
 */
 
@@ -191,8 +191,8 @@ class ResidentTest : Form
         if (!GetGUIThreadInfo(0, ref gti))
         {
             Console.WriteLine("GetGUIThreadInfo failed");
-            // ロック解除時に例外0x80004005が発生する
-            // throw new System.ComponentModel.Win32Exception();
+            // スタートアップやロック解除時に例外0x80004005が発生する
+            //throw new System.ComponentModel.Win32Exception();
             return;
         }
 
@@ -262,7 +262,9 @@ class ResidentTest : Form
                 imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
                 if (imeEnabled)
                 {
+#if DEBUG
                     Console.WriteLine("IMEを有効にしました");
+#endif
                     changeIme = true;
                 }
                 else
@@ -277,7 +279,9 @@ class ResidentTest : Form
                 imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
                 if (!imeEnabled)
                 {
+#if DEBUG
                     Console.WriteLine("IMEを無効にしました");
+#endif
                     changeIme = true;
                 }
                 else
