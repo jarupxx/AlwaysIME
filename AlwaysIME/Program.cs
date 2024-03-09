@@ -35,12 +35,17 @@ class MainWindow
 class ResidentTest : Form
 {
     private System.Windows.Forms.Timer timer;
+    private NotifyIcon icon;
+    private int iconsize;
     static string previousWindowTitle;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
+    static bool flagFirewall = false;
+    static uint delayFirewall = 0xFFFFFFFF;
     private string foregroundWindowTitle;
     private string[] appArray;
+    private string[] FirewallBlockArray;
     private int imeInterval = 1000;
     private int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
@@ -146,20 +151,29 @@ class ResidentTest : Form
         {
             System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
         }
+        string FirewallBlockList = ConfigurationManager.AppSettings["FWBlockList"];
+        if (!string.IsNullOrEmpty(FirewallBlockList))
+        {
+            FirewallBlockArray = FirewallBlockList.Split(',');
+        }
+        else
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
     }
 
     private void Close_Click(object sender, EventArgs e)
     {
+        icon.Visible = false;
+        icon.Dispose();
         System.Windows.Forms.Application.Exit();
     }
     private void setComponents()
     {
-        float dpiX;
         using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
-            dpiX = graphics.DpiX;
-        NotifyIcon icon = new NotifyIcon();
-        icon.Icon = new Icon("app.ico", (int)(SystemParameters.SmallIconWidth * dpiX / 96),
-                                        (int)(SystemParameters.SmallIconHeight * dpiX / 96));
+            iconsize = (int)(SystemParameters.SmallIconWidth * graphics.DpiX / 96);
+        icon = new NotifyIcon();
+        icon.Icon = new Icon("green.ico", iconsize, iconsize);
         icon.Visible = true;
         icon.Text = "AlwaysIME";
         ContextMenuStrip menu = new ContextMenuStrip();
@@ -266,6 +280,39 @@ class ResidentTest : Form
         Process[] processes = Process.GetProcessesByName(processName);
         // プロセス名を取得
         Process[] array = Process.GetProcesses();
+
+        // 非アクティブになってから300回ループ(5分)で解除する
+        delayFirewall--;
+        if (FirewallBlockArray != null)
+        {
+            for (int i = 0; i < FirewallBlockArray.Length; i++)
+            {
+                if (processName.ToLower() == FirewallBlockArray[i].ToLower())
+                {
+                    delayFirewall = 5 * 60;
+                    Console.WriteLine($"{processName} によりFirewallをブロックします。");
+                }
+                if (processName.ToLower() == FirewallBlockArray[i].ToLower() & !flagFirewall)
+                {
+                    // アクティブならFirewallでブロックする
+                    string appPath = @"C:\Program Files\SkipUAC\SkipUAC.exe";
+                    string argv = "/ID foo";
+                    Process.Start(appPath, argv);
+                    flagFirewall = true;
+                    icon.Icon = new Icon("red.ico", iconsize, iconsize);
+                }
+            }
+        }
+        if (delayFirewall == 0)
+        {
+            // 非アクティブならFirewallを解除する
+            string appPath = @"C:\Program Files\SkipUAC\SkipUAC.exe";
+            string argv = "/ID bar";
+            Process.Start(appPath, argv);
+            flagFirewall = false;
+            delayFirewall = 0xFFFFFFFF;
+            icon.Icon = new Icon("green.ico", iconsize, iconsize);
+        }
 
         if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
         {
