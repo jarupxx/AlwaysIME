@@ -38,9 +38,15 @@ class ResidentTest : Form
     static string previousWindowTitle;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
+    static bool noKeyInput = false;
     private string foregroundWindowTitle;
     private string[] appArray;
     private int imeInterval = 1000;
+    private int noKeyInputInterval = 6000;
+    private DateTime lastInputTime;
+
+    [DllImport("user32.dll")]
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
@@ -61,6 +67,11 @@ class ResidentTest : Form
     static extern bool GetGUIThreadInfo(uint dwthreadid, ref GUITHREADINFO lpguithreadinfo);
 
     [StructLayout(LayoutKind.Sequential)]
+    struct LASTINPUTINFO
+    {
+        public uint cbSize;
+        public uint dwTime;
+    }
     public struct GUITHREADINFO
     {
         public int cbSize;
@@ -105,6 +116,7 @@ class ResidentTest : Form
         this.timer.Interval = imeInterval;
         this.timer.Tick += new EventHandler(Timer_Tick);
         this.timer.Start();
+        this.lastInputTime = DateTime.Now;
     }
 
     public void InitializeAppArray()
@@ -121,6 +133,14 @@ class ResidentTest : Form
         try
         {
             imeInterval = int.Parse(ConfigurationManager.AppSettings["intervalTime"]);
+        }
+        catch (Exception)
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        try
+        {
+            noKeyInputInterval = int.Parse(ConfigurationManager.AppSettings["NoKeyInputTime"]) * 1000;
         }
         catch (Exception)
         {
@@ -180,7 +200,13 @@ class ResidentTest : Form
     {
         MonitorActiveWindow();
     }
-
+    private void CheckLastKeyInput()
+    {
+        LASTINPUTINFO lastInputInfo = new LASTINPUTINFO();
+        lastInputInfo.cbSize = (uint)Marshal.SizeOf(lastInputInfo);
+        GetLastInputInfo(ref lastInputInfo);
+        lastInputTime = DateTime.Now.AddMilliseconds(-(Environment.TickCount - lastInputInfo.dwTime));
+    }
     // 半角カナ/全角英数/カタカナ モードを強制的に「ひらがな」モードに変更する
     void MonitorActiveWindow()
     {
@@ -210,6 +236,20 @@ class ResidentTest : Form
             Console.WriteLine("IMEが無効です");
             changeIme = false;
             return;
+        }
+
+        // キーボード入力されたかチェック
+        CheckLastKeyInput();
+        if ((DateTime.Now - lastInputTime).TotalMilliseconds >= noKeyInputInterval)
+        {
+            if(!noKeyInput)
+            Console.WriteLine("キーボード入力がないのでIMEオンにしました");
+            SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
+            noKeyInput = true;
+        }
+        else
+        {
+            noKeyInput = false;
         }
 
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
