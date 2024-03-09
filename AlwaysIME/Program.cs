@@ -46,6 +46,10 @@ class ResidentTest : Form
     private string foregroundWindowTitle;
     private string[] appArray;
     private string[] FirewallBlockArray;
+    private string FWappPathA;
+    private string FWargvA;
+    private string FWappPathB;
+    private string FWargvB;
     private int imeInterval = 1000;
     private int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
@@ -159,6 +163,38 @@ class ResidentTest : Form
         else
         {
             System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        try
+        {
+            FWappPathA = (ConfigurationManager.AppSettings["appPathA"]);
+        }
+        catch (Exception)
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        try
+        {
+            FWargvA = (ConfigurationManager.AppSettings["argvA"]);
+        }
+        catch (Exception)
+        {
+            /* Nothing to do */
+        }
+        try
+        {
+            FWappPathB = (ConfigurationManager.AppSettings["appPathB"]);
+        }
+        catch (Exception)
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        try
+        {
+            FWargvB = (ConfigurationManager.AppSettings["argvB"]);
+        }
+        catch (Exception)
+        {
+            /* Nothing to do */
         }
     }
 
@@ -295,9 +331,7 @@ class ResidentTest : Form
                 if (processName.ToLower() == FirewallBlockArray[i].ToLower() & !flagFirewall)
                 {
                     // アクティブならFirewallでブロックする
-                    string appPath = @"C:\Program Files\SkipUAC\SkipUAC.exe";
-                    string argv = "/ID foo";
-                    Process.Start(appPath, argv);
+                    Process.Start(FWappPathA, FWargvA);
                     flagFirewall = true;
                     icon.Icon = new Icon("red.ico", iconsize, iconsize);
                 }
@@ -306,9 +340,7 @@ class ResidentTest : Form
         if (delayFirewall == 0)
         {
             // 非アクティブならFirewallを解除する
-            string appPath = @"C:\Program Files\SkipUAC\SkipUAC.exe";
-            string argv = "/ID bar";
-            Process.Start(appPath, argv);
+            Process.Start(FWappPathB, FWargvB);
             flagFirewall = false;
             delayFirewall = 0xFFFFFFFF;
             icon.Icon = new Icon("green.ico", iconsize, iconsize);
