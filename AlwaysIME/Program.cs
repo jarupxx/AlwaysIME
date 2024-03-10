@@ -279,7 +279,7 @@ class ResidentTest : Form
         bool imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
 
 #if DEBUG
-        Console.WriteLine(imeEnabled.ToString() + " status code:" + imeConvMode.ToString());
+        Console.WriteLine($"{imeEnabled.ToString()} status code:{imeConvMode.ToString()}");
 #endif
         if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
         {
@@ -349,15 +349,13 @@ class ResidentTest : Form
         if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
         {
 #if DEBUG
-            Console.WriteLine("ウィンドウのタイトル: " + buff.ToString());
-            Console.WriteLine("プロセス名: " + processName);
+            Console.WriteLine($"タイトル:{buff.ToString()} プロセス名:{processName}");
 #endif
             foregroundWindowTitle = buff.ToString();
         }
         else
         {
-            Console.WriteLine("ウィンドウのタイトル: が取得できません。" + buff.ToString());
-            Console.WriteLine("プロセス名: " + processName);
+            Console.WriteLine($"タイトルを取得できません。タイトル:{buff.ToString()} プロセス名:{processName}");
             return;
         }
         if (appArray != null)
