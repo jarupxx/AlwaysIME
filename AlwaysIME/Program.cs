@@ -151,7 +151,7 @@ class ResidentTest : Form
         }
         try
         {
-            noKeyInputInterval = int.Parse(ConfigurationManager.AppSettings["NoKeyInputTime"]) * 1000;
+            noKeyInputInterval = (int)(float.Parse(ConfigurationManager.AppSettings["NoKeyInputTime"]) * 60 * 1000);
         }
         catch (Exception)
         {
