@@ -292,10 +292,26 @@ class ResidentTest : Form
         CheckLastKeyInput();
         if ((DateTime.Now - lastInputTime).TotalMilliseconds >= noKeyInputInterval)
         {
-            if(!noKeyInput)
-            Console.WriteLine("キーボード入力がないのでIMEオンにしました");
-            SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
-            noKeyInput = true;
+            if (!noKeyInput)
+            {
+                SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
+                imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
+                if (imeEnabled)
+                {
+#if DEBUG
+                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
+                    Console.WriteLine("IMEを有効にしました");
+#endif
+                    changeIme = true;
+                    noKeyInput = true;
+                }
+                else
+                {
+                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
+                    Console.WriteLine("IMEが有効になりません");
+                    changeIme = false;
+                }
+            }
         }
         else
         {
