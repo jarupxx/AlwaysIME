@@ -219,7 +219,7 @@ class ResidentTest : Form
         using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
             iconsize = (int)(SystemParameters.SmallIconWidth * graphics.DpiX / 96);
         icon = new NotifyIcon();
-        icon.Icon = new Icon("green.ico", iconsize, iconsize);
+        icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         icon.Visible = true;
         icon.Text = "AlwaysIME";
         ContextMenuStrip menu = new ContextMenuStrip();
@@ -287,7 +287,7 @@ class ResidentTest : Form
                     // アクティブならFirewallでブロックする
                     Process.Start(FWappPathA, FWargvA);
                     flagFirewall = true;
-                    icon.Icon = new Icon("red.ico", iconsize, iconsize);
+                    icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
                 }
             }
         }
@@ -297,7 +297,7 @@ class ResidentTest : Form
             Process.Start(FWappPathB, FWargvB);
             flagFirewall = false;
             delayFirewall = 0xFFFFFFFF;
-            icon.Icon = new Icon("green.ico", iconsize, iconsize);
+            icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
 #if DEBUG
             Console.WriteLine("時間経過によりFirewallを許可します");
 #endif
@@ -401,7 +401,7 @@ class ResidentTest : Form
 #if DEBUG
                     Console.WriteLine($"{processName} はAppListに含まれています。");
 #endif
-                    icon.Icon = new Icon("gray.ico", iconsize, iconsize);
+                    icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
                     return;
                 }
             }
@@ -465,7 +465,7 @@ class ResidentTest : Form
         {
             previousWindowTitle = foregroundWindowTitle;
             previousimeEnabled = imeEnabled;
-            icon.Icon = new Icon("green.ico", iconsize, iconsize);
+            icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         }
     }
 }
