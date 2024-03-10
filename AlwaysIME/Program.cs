@@ -43,6 +43,7 @@ class ResidentTest : Form
     static bool noKeyInput = false;
     static bool flagFirewall = false;
     static uint delayFirewall = 0xFFFFFFFF;
+    static string processName;
     private string foregroundWindowTitle;
     private string[] appArray;
     private string[] FirewallBlockArray;
@@ -51,6 +52,7 @@ class ResidentTest : Form
     private string FWappPathB;
     private string FWargvB;
     private int imeInterval = 1000;
+    private uint FWAllowInterval = 0xFFFFFFFF;
     private int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
 
@@ -182,6 +184,14 @@ class ResidentTest : Form
         }
         try
         {
+            FWAllowInterval = uint.Parse(ConfigurationManager.AppSettings["FWAllowCount"]);
+        }
+        catch (Exception)
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        try
+        {
             FWappPathB = (ConfigurationManager.AppSettings["appPathB"]);
         }
         catch (Exception)
@@ -249,6 +259,7 @@ class ResidentTest : Form
     private void Timer_Tick(object sender, EventArgs e)
     {
         MonitorActiveWindow();
+        MonitorFirewall();
     }
     private void CheckLastKeyInput()
     {
@@ -257,6 +268,42 @@ class ResidentTest : Form
         GetLastInputInfo(ref lastInputInfo);
         lastInputTime = DateTime.Now.AddMilliseconds(-(Environment.TickCount - lastInputInfo.dwTime));
     }
+
+    void MonitorFirewall()
+    {
+        // 非アクティブになってから{FWAllowCount}回ループで解除する
+        delayFirewall--;
+        if (FirewallBlockArray != null)
+        {
+            for (int i = 0; i < FirewallBlockArray.Length; i++)
+            {
+                if (processName.ToLower() == FirewallBlockArray[i].ToLower())
+                {
+                    delayFirewall = FWAllowInterval;
+                    Console.WriteLine($"{processName} によりFirewallをブロックします。");
+                }
+                if (processName.ToLower() == FirewallBlockArray[i].ToLower() & !flagFirewall)
+                {
+                    // アクティブならFirewallでブロックする
+                    Process.Start(FWappPathA, FWargvA);
+                    flagFirewall = true;
+                    icon.Icon = new Icon("red.ico", iconsize, iconsize);
+                }
+            }
+        }
+        if (delayFirewall == 0)
+        {
+            // 非アクティブならFirewallを解除する
+            Process.Start(FWappPathB, FWargvB);
+            flagFirewall = false;
+            delayFirewall = 0xFFFFFFFF;
+            icon.Icon = new Icon("green.ico", iconsize, iconsize);
+#if DEBUG
+            Console.WriteLine("時間経過によりFirewallを許可します");
+#endif
+        }
+    }
+
     // 半角カナ/全角英数/カタカナ モードを強制的に「ひらがな」モードに変更する
     void MonitorActiveWindow()
     {
@@ -328,39 +375,10 @@ class ResidentTest : Form
         // プロセスを取得
         Process process = Process.GetProcessById((int)processId);
         // プロセス名を取得
-        string processName = process.ProcessName;
+        processName = process.ProcessName;
         Process[] processes = Process.GetProcessesByName(processName);
         // プロセス名を取得
         Process[] array = Process.GetProcesses();
-
-        // 非アクティブになってから300回ループ(5分)で解除する
-        delayFirewall--;
-        if (FirewallBlockArray != null)
-        {
-            for (int i = 0; i < FirewallBlockArray.Length; i++)
-            {
-                if (processName.ToLower() == FirewallBlockArray[i].ToLower())
-                {
-                    delayFirewall = 5 * 60;
-                    Console.WriteLine($"{processName} によりFirewallをブロックします。");
-                }
-                if (processName.ToLower() == FirewallBlockArray[i].ToLower() & !flagFirewall)
-                {
-                    // アクティブならFirewallでブロックする
-                    Process.Start(FWappPathA, FWargvA);
-                    flagFirewall = true;
-                    icon.Icon = new Icon("red.ico", iconsize, iconsize);
-                }
-            }
-        }
-        if (delayFirewall == 0)
-        {
-            // 非アクティブならFirewallを解除する
-            Process.Start(FWappPathB, FWargvB);
-            flagFirewall = false;
-            delayFirewall = 0xFFFFFFFF;
-            icon.Icon = new Icon("green.ico", iconsize, iconsize);
-        }
 
         if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
         {
