@@ -401,6 +401,7 @@ class ResidentTest : Form
 #if DEBUG
                     Console.WriteLine($"{processName} はAppListに含まれています。");
 #endif
+                    icon.Icon = new Icon("gray.ico", iconsize, iconsize);
                     return;
                 }
             }
@@ -464,6 +465,7 @@ class ResidentTest : Form
         {
             previousWindowTitle = foregroundWindowTitle;
             previousimeEnabled = imeEnabled;
+            icon.Icon = new Icon("green.ico", iconsize, iconsize);
         }
     }
 }
