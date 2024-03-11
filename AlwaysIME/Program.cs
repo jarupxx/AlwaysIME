@@ -277,17 +277,20 @@ class ResidentTest : Form
         {
             for (int i = 0; i < FirewallBlockArray.Length; i++)
             {
-                if (processName.ToLower() == FirewallBlockArray[i].ToLower())
+                if (!string.IsNullOrEmpty(processName))
                 {
-                    delayFirewall = FWAllowInterval;
-                    Console.WriteLine($"{processName} によりFirewallをブロックします。");
-                }
-                if (processName.ToLower() == FirewallBlockArray[i].ToLower() & !flagFirewall)
-                {
-                    // アクティブならFirewallでブロックする
-                    Process.Start(FWappPathA, FWargvA);
-                    flagFirewall = true;
-                    icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
+                    if (processName.ToLower() == FirewallBlockArray[i].ToLower())
+                    {
+                        delayFirewall = FWAllowInterval;
+                        Console.WriteLine($"{processName} によりFirewallをブロックします。");
+                    }
+                    if (processName.ToLower() == FirewallBlockArray[i].ToLower() & !flagFirewall)
+                    {
+                        // アクティブならFirewallでブロックする
+                        Process.Start(FWappPathA, FWargvA);
+                        flagFirewall = true;
+                        icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
+                    }
                 }
             }
         }
