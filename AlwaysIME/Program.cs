@@ -141,7 +141,7 @@ class ResidentTest : Form
     public void InitializeAppArray()
     {
         string AlwaysIMEMode = ConfigurationManager.AppSettings["AlwaysIMEMode"];
-        if (AlwaysIMEMode.ToLower().CompareTo("on") == 0)
+        if (AlwaysIMEMode.ToLower().CompareTo("off") == 0)
         {
             ImeModeGlobal = true;
         }
@@ -339,6 +339,17 @@ class ResidentTest : Form
         MonitorActiveWindow();
         MonitorFirewall();
     }
+    private void SetIcon()
+    {
+        if (flagFirewall)
+        {
+            icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
+        }
+        else
+        {
+            icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+        }
+    }
     private bool CheckProcessAppArray()
     {
         if (appArray != null)
@@ -531,7 +542,7 @@ class ResidentTest : Form
         imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
 
 #if DEBUG
-        Console.WriteLine($"{imeEnabled.ToString()} status code:{imeConvMode.ToString()}");
+        Console.WriteLine($"{imeEnabled} status code:{imeConvMode}");
 #endif
         if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
         {
@@ -561,13 +572,13 @@ class ResidentTest : Form
         if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
         {
 #if DEBUG
-            Console.WriteLine($"タイトル:{buff.ToString()} プロセス名:{processName}");
+            Console.WriteLine($"タイトル:{buff} プロセス名:{processName}");
 #endif
             foregroundWindowTitle = buff.ToString();
         }
         else
         {
-            Console.WriteLine($"タイトルを取得できません。タイトル:{buff.ToString()} プロセス名:{processName}");
+            Console.WriteLine($"タイトルを取得できません。タイトル:{buff} プロセス名:{processName}");
             return;
         }
 
@@ -604,6 +615,7 @@ class ResidentTest : Form
                     SetImePreset();
                 }
             }
+            SetIcon();
         }
         if (imeEnabled)
         {
@@ -627,7 +639,6 @@ class ResidentTest : Form
         {
             previousWindowTitle = foregroundWindowTitle;
             previousimeEnabled = imeEnabled;
-            icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         }
     }
 }
