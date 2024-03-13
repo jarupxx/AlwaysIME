@@ -46,6 +46,7 @@ class ResidentTest : Form
     static string processName;
     private string foregroundWindowTitle;
     private string[] appArray;
+    private string[] ImeOffArray;
     private string[] FirewallBlockArray;
     private string FWappPathA;
     private string FWargvA;
@@ -139,6 +140,15 @@ class ResidentTest : Form
         if (!string.IsNullOrEmpty(appList))
         {
             appArray = appList.Split(',');
+        }
+        else
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        string ImeOffList = ConfigurationManager.AppSettings["ImeOffList"];
+        if (!string.IsNullOrEmpty(ImeOffList))
+        {
+            ImeOffArray = ImeOffList.Split(',');
         }
         else
         {
@@ -278,7 +288,20 @@ class ResidentTest : Form
         }
         return false;
     }
-
+    private bool CheckProcessImeOffArray()
+    {
+        if (ImeOffArray != null)
+        {
+            for (int i = 0; i < ImeOffArray.Length; i++)
+            {
+                if (processName.ToLower() == ImeOffArray[i].ToLower())
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     private void CheckLastKeyInput()
     {
         LASTINPUTINFO lastInputInfo = new LASTINPUTINFO();
@@ -314,6 +337,65 @@ class ResidentTest : Form
         }
     }
 
+    private void SetImeGlobal()
+    {
+        if (previousimeEnabled)
+        {
+            SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
+            imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
+            if (imeEnabled)
+            {
+#if DEBUG
+                Console.WriteLine("IMEを有効にしました");
+#endif
+                changeIme = true;
+            }
+            else
+            {
+                Console.WriteLine("IMEが有効になりません");
+                changeIme = false;
+            }
+        }
+        else
+        {
+            SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, IntPtr.Zero);
+            imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
+            if (!imeEnabled)
+            {
+#if DEBUG
+                Console.WriteLine("IMEを無効にしました");
+#endif
+                changeIme = true;
+            }
+            else
+            {
+                Console.WriteLine("IMEが無効になりません");
+                changeIme = false;
+            }
+        }
+    }
+
+    private void SetImeOffList()
+    {
+        // previousWindowTitle：更新 previousimeEnabled：そのまま
+        SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, IntPtr.Zero);
+        imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
+        if (!imeEnabled)
+        {
+#if DEBUG
+            Console.WriteLine("SetImeOffList：IMEを無効にしました");
+#endif
+            changeIme = false;
+            previousWindowTitle = foregroundWindowTitle;
+        }
+        else
+        {
+            Console.WriteLine("SetImeOffList：IMEが無効になりません");
+            changeIme = false;
+        }
+    }
+    private void SetImePreset()
+    { }
     void MonitorFirewall()
     {
         // 非アクティブになってから{FWAllowCount}回ループで解除する
@@ -425,40 +507,10 @@ class ResidentTest : Form
 
         if (foregroundWindowTitle != previousWindowTitle)
         {
-            if (previousimeEnabled)
-            {
-                SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
-                imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
-                if (imeEnabled)
-                {
-#if DEBUG
-                    Console.WriteLine("IMEを有効にしました");
-#endif
-                    changeIme = true;
-                }
-                else
-                {
-                    Console.WriteLine("IMEが有効になりません");
-                    changeIme = false;
-                }
-            }
+            if (CheckProcessImeOffArray())
+                SetImeOffList();
             else
-            {
-                SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, IntPtr.Zero);
-                imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
-                if (!imeEnabled)
-                {
-#if DEBUG
-                    Console.WriteLine("IMEを無効にしました");
-#endif
-                    changeIme = true;
-                }
-                else
-                {
-                    Console.WriteLine("IMEが無効になりません");
-                    changeIme = false;
-                }
-            }
+                SetImeGlobal();
         }
         if (imeEnabled)
         {
