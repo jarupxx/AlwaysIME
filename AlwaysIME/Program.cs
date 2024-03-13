@@ -264,6 +264,21 @@ class ResidentTest : Form
         MonitorActiveWindow();
         MonitorFirewall();
     }
+    private bool CheckProcessAppArray()
+    {
+        if (appArray != null)
+        {
+            for (int i = 0; i < appArray.Length; i++)
+            {
+                if (processName.ToLower() == appArray[i].ToLower())
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private void CheckLastKeyInput()
     {
         LASTINPUTINFO lastInputInfo = new LASTINPUTINFO();
@@ -398,20 +413,16 @@ class ResidentTest : Form
             Console.WriteLine($"タイトルを取得できません。タイトル:{buff.ToString()} プロセス名:{processName}");
             return;
         }
-        if (appArray != null)
+
+        if (CheckProcessAppArray())
         {
-            for (int i = 0; i < appArray.Length; i++)
-            {
-                if (processName.ToLower() == appArray[i].ToLower())
-                {
 #if DEBUG
-                    Console.WriteLine($"{processName} はAppListに含まれています。");
+            Console.WriteLine($"{processName} はAppListに含まれています。");
 #endif
-                    icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
-                    return;
-                }
-            }
+            icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
+            return;
         }
+
         if (foregroundWindowTitle != previousWindowTitle)
         {
             if (previousimeEnabled)
