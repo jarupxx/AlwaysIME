@@ -55,6 +55,9 @@ class ResidentTest : Form
     private uint FWAllowInterval = 0xFFFFFFFF;
     private int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
+    IntPtr imwd;
+    int imeConvMode = 0;
+    bool imeEnabled = false;
 
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
@@ -267,6 +270,33 @@ class ResidentTest : Form
         lastInputInfo.cbSize = (uint)Marshal.SizeOf(lastInputInfo);
         GetLastInputInfo(ref lastInputInfo);
         lastInputTime = DateTime.Now.AddMilliseconds(-(Environment.TickCount - lastInputInfo.dwTime));
+        if ((DateTime.Now - lastInputTime).TotalMilliseconds >= noKeyInputInterval)
+        {
+            if (!noKeyInput)
+            {
+                SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
+                imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
+                if (imeEnabled)
+                {
+#if DEBUG
+                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
+                    Console.WriteLine("IMEを有効にしました");
+#endif
+                    changeIme = true;
+                    noKeyInput = true;
+                }
+                else
+                {
+                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
+                    Console.WriteLine("IMEが有効になりません");
+                    changeIme = false;
+                }
+            }
+        }
+        else
+        {
+            noKeyInput = false;
+        }
     }
 
     void MonitorFirewall()
@@ -322,11 +352,11 @@ class ResidentTest : Form
             return;
         }
 
-        IntPtr imwd = ImmGetDefaultIMEWnd(gti.hwndFocus);
+        imwd = ImmGetDefaultIMEWnd(gti.hwndFocus);
 
         // IMEの有効/無効の状態を確認
-        int imeConvMode = SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETCONVERSIONMODE, IntPtr.Zero);
-        bool imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
+        imeConvMode = SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETCONVERSIONMODE, IntPtr.Zero);
+        imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
 
 #if DEBUG
         Console.WriteLine($"{imeEnabled.ToString()} status code:{imeConvMode.ToString()}");
@@ -340,33 +370,6 @@ class ResidentTest : Form
 
         // キーボード入力されたかチェック
         CheckLastKeyInput();
-        if ((DateTime.Now - lastInputTime).TotalMilliseconds >= noKeyInputInterval)
-        {
-            if (!noKeyInput)
-            {
-                SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
-                imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
-                if (imeEnabled)
-                {
-#if DEBUG
-                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
-                    Console.WriteLine("IMEを有効にしました");
-#endif
-                    changeIme = true;
-                    noKeyInput = true;
-                }
-                else
-                {
-                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
-                    Console.WriteLine("IMEが有効になりません");
-                    changeIme = false;
-                }
-            }
-        }
-        else
-        {
-            noKeyInput = false;
-        }
 
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
