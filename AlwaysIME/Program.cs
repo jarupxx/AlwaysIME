@@ -38,6 +38,7 @@ class ResidentTest : Form
     private NotifyIcon icon;
     private int iconsize;
     static string previousWindowTitle;
+    static bool ImeModeGlobal = true;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
@@ -136,6 +137,15 @@ class ResidentTest : Form
 
     public void InitializeAppArray()
     {
+        string AlwaysIMEMode = ConfigurationManager.AppSettings["AlwaysIMEMode"];
+        if (AlwaysIMEMode.ToLower().CompareTo("on") == 0)
+        {
+            ImeModeGlobal = true;
+        }
+        else
+        {
+            ImeModeGlobal = false;
+        }
         string appList = ConfigurationManager.AppSettings["AppList"];
         if (!string.IsNullOrEmpty(appList))
         {
@@ -312,23 +322,18 @@ class ResidentTest : Form
         {
             if (!noKeyInput)
             {
-                SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
-                imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
-                if (imeEnabled)
-                {
 #if DEBUG
-                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
-                    Console.WriteLine("IMEを有効にしました");
+                Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
 #endif
-                    changeIme = true;
-                    noKeyInput = true;
+                if (CheckProcessImeOffArray())
+                {
+                    SetImeOffList();
                 }
                 else
                 {
-                    Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
-                    Console.WriteLine("IMEが有効になりません");
-                    changeIme = false;
+                    SetImePreset();
                 }
+                noKeyInput = true;
             }
         }
         else
@@ -395,7 +400,22 @@ class ResidentTest : Form
         }
     }
     private void SetImePreset()
-    { }
+    {
+        SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETOPENSTATUS, (IntPtr)1);
+        imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
+        if (imeEnabled)
+        {
+#if DEBUG
+            Console.WriteLine("IMEを有効にしました");
+#endif
+            changeIme = true;
+        }
+        else
+        {
+            Console.WriteLine("IMEが有効になりません");
+            changeIme = false;
+        }
+    }
     void MonitorFirewall()
     {
         // 非アクティブになってから{FWAllowCount}回ループで解除する
@@ -507,10 +527,28 @@ class ResidentTest : Form
 
         if (foregroundWindowTitle != previousWindowTitle)
         {
-            if (CheckProcessImeOffArray())
-                SetImeOffList();
-            else
-                SetImeGlobal();
+            if (ImeModeGlobal)
+            {
+                if (CheckProcessImeOffArray())
+                {
+                    SetImeOffList();
+                }
+                else
+                {
+                    SetImeGlobal();
+                }
+            }
+            if (!ImeModeGlobal)
+            {
+                if (CheckProcessImeOffArray())
+                {
+                    SetImeOffList();
+                }
+                else
+                {
+                    SetImePreset();
+                }
+            }
         }
         if (imeEnabled)
         {
