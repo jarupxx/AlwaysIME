@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 
@@ -54,6 +55,8 @@ class ResidentTest : Form
     private string FWappPathB;
     private string FWargvB;
     private int imeInterval = 1000;
+    private int SuspendFewInterval = 5;
+    private int SuspendInterval = 45;
     private uint FWAllowInterval = 0xFFFFFFFF;
     private int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
@@ -174,6 +177,22 @@ class ResidentTest : Form
         }
         try
         {
+            SuspendFewInterval = int.Parse(ConfigurationManager.AppSettings["SuspendFewTime"]);
+        }
+        catch (Exception)
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        try
+        {
+            SuspendInterval = int.Parse(ConfigurationManager.AppSettings["SuspendTime"]);
+        }
+        catch (Exception)
+        {
+            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+        }
+        try
+        {
             noKeyInputInterval = (int)(float.Parse(ConfigurationManager.AppSettings["NoKeyInputTime"]) * 60 * 1000);
         }
         catch (Exception)
@@ -247,9 +266,18 @@ class ResidentTest : Form
         icon.Text = "AlwaysIME";
         ContextMenuStrip menu = new ContextMenuStrip();
 
-        ToolStripMenuItem menuItemTop = new ToolStripMenuItem();
-        menuItemTop.Text = "更新間隔";
-        menu.Items.Add(menuItemTop);
+        ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
+        suspendFewMenuItem.Text = "少し無効";
+        suspendFewMenuItem.Click += new EventHandler(SuspendFewMenuItem_Click);
+        menu.Items.Add(suspendFewMenuItem);
+        ToolStripMenuItem suspendMenuItem = new ToolStripMenuItem();
+        suspendMenuItem.Text = "しばらく無効";
+        suspendMenuItem.Click += new EventHandler(SuspendMenuItem_Click);
+        menu.Items.Add(suspendMenuItem);
+        ToolStripMenuItem resumeMenuItem = new ToolStripMenuItem();
+        resumeMenuItem.Text = "更新間隔";
+        resumeMenuItem.Click += new EventHandler(ResumeMenuItem_Click);
+        menu.Items.Add(resumeMenuItem);
         ToolStripMenuItem menuItem500 = new ToolStripMenuItem();
         menuItem500.Text = "> 500 ms";
         menuItem500.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(500));
@@ -267,6 +295,33 @@ class ResidentTest : Form
         menuItem.Click += new EventHandler(Close_Click);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
+    }
+    private void ResumeMenuItem_Click(object sender, EventArgs e)
+    {
+        this.timer.Start();
+        icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+        Console.WriteLine("クリックにより再開しました。");
+    }
+    private async void SuspendFewMenuItem_Click(object sender, EventArgs e)
+    {
+        await SuspendAsync(TimeSpan.FromMinutes(SuspendFewInterval));
+    }
+    private async void SuspendMenuItem_Click(object sender, EventArgs e)
+    {
+        await SuspendAsync(TimeSpan.FromMinutes(SuspendInterval));
+    }
+
+    private async Task SuspendAsync(TimeSpan duration)
+    {
+        icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
+        Console.WriteLine($"{duration}分間無効にします。");
+
+        this.timer.Stop();
+        await Task.Delay(duration);
+        this.timer.Start();
+
+        icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+        Console.WriteLine("再開しました。");
     }
     private void ChangeIntervalAndSave(int interval)
     {
