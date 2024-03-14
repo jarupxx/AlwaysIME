@@ -2,6 +2,7 @@ using System;
 using System.Configuration;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -44,7 +45,7 @@ class ResidentTest : Form
     static bool changeIme = false;
     static bool noKeyInput = false;
     static bool flagFirewall = false;
-    static uint delayFirewall = 0xFFFFFFFF;
+    static int delayFirewall = 2147483647;
     static string processName;
     private string foregroundWindowTitle;
     private string[] appArray;
@@ -57,7 +58,7 @@ class ResidentTest : Form
     private int imeInterval = 1000;
     private int SuspendFewInterval = 5;
     private int SuspendInterval = 45;
-    private uint FWAllowInterval = 0xFFFFFFFF;
+    private int FWAllowInterval = 2147483647;
     private int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
     IntPtr imwd;
@@ -141,9 +142,16 @@ class ResidentTest : Form
     public void InitializeAppArray()
     {
         string AlwaysIMEMode = ConfigurationManager.AppSettings["AlwaysIMEMode"];
-        if (AlwaysIMEMode.ToLower().CompareTo("off") == 0)
+        if (!string.IsNullOrEmpty(AlwaysIMEMode))
         {
-            ImeModeGlobal = true;
+            if (AlwaysIMEMode.ToLower().CompareTo("off") == 0)
+            {
+                ImeModeGlobal = true;
+            }
+            else
+            {
+                ImeModeGlobal = false;
+            }
         }
         else
         {
@@ -156,7 +164,7 @@ class ResidentTest : Form
         }
         else
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            /* Nothing to do */
         }
         string ImeOffList = ConfigurationManager.AppSettings["ImeOffList"];
         if (!string.IsNullOrEmpty(ImeOffList))
@@ -165,7 +173,7 @@ class ResidentTest : Form
         }
         else
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            /* Nothing to do */
         }
         try
         {
@@ -173,7 +181,7 @@ class ResidentTest : Form
         }
         catch (Exception)
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            /* Nothing to do */
         }
         try
         {
@@ -181,7 +189,7 @@ class ResidentTest : Form
         }
         catch (Exception)
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            /* Nothing to do */
         }
         try
         {
@@ -189,7 +197,7 @@ class ResidentTest : Form
         }
         catch (Exception)
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            /* Nothing to do */
         }
         try
         {
@@ -197,7 +205,15 @@ class ResidentTest : Form
         }
         catch (Exception)
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            /* Nothing to do */
+        }
+        try
+        {
+            FWAllowInterval = int.Parse(ConfigurationManager.AppSettings["FWAllowCount"]);
+        }
+        catch (Exception)
+        {
+            /* Nothing to do */
         }
         string FirewallBlockList = ConfigurationManager.AppSettings["FWBlockList"];
         if (!string.IsNullOrEmpty(FirewallBlockList))
@@ -206,16 +222,22 @@ class ResidentTest : Form
         }
         else
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
+            /* Nothing to do */
         }
-        try
+        FWappPathA = (ConfigurationManager.AppSettings["appPathA"]);
+        if (!string.IsNullOrEmpty(FWappPathA))
         {
-            FWappPathA = (ConfigurationManager.AppSettings["appPathA"]);
+            if (!File.Exists(FWappPathA))
+            {
+                System.Windows.Forms.MessageBox.Show("FWappPathA に指定したアプリが見つかりません。");
+                // Firewall機能を無効にする
+                FirewallBlockArray = null;
+            }
         }
-        catch (Exception)
+        /* else
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
-        }
+            FirewallBlockArray = null;
+        } */
         try
         {
             FWargvA = (ConfigurationManager.AppSettings["argvA"]);
@@ -224,22 +246,20 @@ class ResidentTest : Form
         {
             /* Nothing to do */
         }
-        try
+        FWappPathB = (ConfigurationManager.AppSettings["appPathB"]);
+        if (!string.IsNullOrEmpty(FWappPathB))
         {
-            FWAllowInterval = uint.Parse(ConfigurationManager.AppSettings["FWAllowCount"]);
+            if (!File.Exists(FWappPathB))
+            {
+                System.Windows.Forms.MessageBox.Show("FWappPathB に指定したアプリが見つかりません。");
+                // Firewall機能を無効にする
+                FirewallBlockArray = null;
+            }
         }
-        catch (Exception)
+        /* else
         {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
-        }
-        try
-        {
-            FWappPathB = (ConfigurationManager.AppSettings["appPathB"]);
-        }
-        catch (Exception)
-        {
-            System.Windows.Forms.MessageBox.Show("AlwaysIME.exe.Config に異常があります。再インストールしてください。");
-        }
+            FirewallBlockArray = null;
+        } */
         try
         {
             FWargvB = (ConfigurationManager.AppSettings["argvB"]);
@@ -512,7 +532,7 @@ class ResidentTest : Form
             // 非アクティブならFirewallを解除する
             Process.Start(FWappPathB, FWargvB);
             flagFirewall = false;
-            delayFirewall = 0xFFFFFFFF;
+            delayFirewall = 2147483647;
             icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
 #if DEBUG
             Console.WriteLine("時間経過によりFirewallを許可します");
