@@ -40,17 +40,21 @@ class ResidentTest : Form
     private NotifyIcon icon;
     private int iconsize;
     static string previousWindowTitle;
+    static string previousprocessName;
     static bool ImeModeGlobal = true;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
     static bool flagFirewall = false;
+    static bool flagRanappA = false;
+    static bool flagRanappB = false;
     static int delayFirewall = 2147483647;
-    static string processName;
+    static string foregroundprocessName;
     private string foregroundWindowTitle;
     private string[] appArray;
     private string[] ImeOffArray;
-    private string[] FirewallBlockArray;
+    private string[] FirewallBlockArrayA;
+    private string[] FirewallBlockArrayB;
     private string FWappPathA;
     private string FWargvA;
     private string FWappPathB;
@@ -215,10 +219,10 @@ class ResidentTest : Form
         {
             /* Nothing to do */
         }
-        string FirewallBlockList = ConfigurationManager.AppSettings["FWBlockList"];
-        if (!string.IsNullOrEmpty(FirewallBlockList))
+        string FirewallBlockListA = ConfigurationManager.AppSettings["FWBlockListA"];
+        if (!string.IsNullOrEmpty(FirewallBlockListA))
         {
-            FirewallBlockArray = FirewallBlockList.Split(',');
+            FirewallBlockArrayA = FirewallBlockListA.Split(',');
         }
         else
         {
@@ -231,12 +235,12 @@ class ResidentTest : Form
             {
                 System.Windows.Forms.MessageBox.Show("FWappPathA に指定したアプリが見つかりません。");
                 // Firewall機能を無効にする
-                FirewallBlockArray = null;
+                flagRanappA = false;
             }
         }
         /* else
         {
-            FirewallBlockArray = null;
+            FirewallBlockArrayA = null;
         } */
         try
         {
@@ -246,19 +250,27 @@ class ResidentTest : Form
         {
             /* Nothing to do */
         }
+        string FirewallBlockListB = ConfigurationManager.AppSettings["FWBlockListB"];
+        if (!string.IsNullOrEmpty(FirewallBlockListB))
+        {
+            FirewallBlockArrayB = FirewallBlockListB.Split(',');
+        }
+        else
+        {
+            /* Nothing to do */
+        }
         FWappPathB = (ConfigurationManager.AppSettings["appPathB"]);
         if (!string.IsNullOrEmpty(FWappPathB))
         {
             if (!File.Exists(FWappPathB))
             {
                 System.Windows.Forms.MessageBox.Show("FWappPathB に指定したアプリが見つかりません。");
-                // Firewall機能を無効にする
-                FirewallBlockArray = null;
+                flagRanappB = false;
             }
         }
         /* else
         {
-            FirewallBlockArray = null;
+            FirewallBlockArrayB = null;
         } */
         try
         {
@@ -357,7 +369,6 @@ class ResidentTest : Form
     private void Timer_Tick(object sender, EventArgs e)
     {
         MonitorActiveWindow();
-        MonitorFirewall();
     }
     private void SetIcon()
     {
@@ -376,7 +387,7 @@ class ResidentTest : Form
         {
             for (int i = 0; i < appArray.Length; i++)
             {
-                if (processName.ToLower() == appArray[i].ToLower())
+                if (foregroundprocessName.ToLower() == appArray[i].ToLower())
                 {
                     return true;
                 }
@@ -390,9 +401,43 @@ class ResidentTest : Form
         {
             for (int i = 0; i < ImeOffArray.Length; i++)
             {
-                if (processName.ToLower() == ImeOffArray[i].ToLower())
+                if (foregroundprocessName.ToLower() == ImeOffArray[i].ToLower())
                 {
                     return true;
+                }
+            }
+        }
+        return false;
+    }
+    private bool CheckProcessFirewallBlockArrayA()
+    {
+        if (FirewallBlockArrayA != null)
+        {
+            if (!string.IsNullOrEmpty(foregroundprocessName))
+            {
+                for (int i = 0; i < FirewallBlockArrayA.Length; i++)
+                {
+                    if (foregroundprocessName.ToLower() == FirewallBlockArrayA[i].ToLower())
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    private bool CheckProcessFirewallBlockArrayB()
+    {
+        if (FirewallBlockArrayB != null)
+        {
+            if (!string.IsNullOrEmpty(previousprocessName))
+            {
+                for (int i = 0; i < FirewallBlockArrayB.Length; i++)
+                {
+                    if (previousprocessName.ToLower() == FirewallBlockArrayB[i].ToLower())
+                    {
+                        return true;
+                    }
                 }
             }
         }
@@ -502,44 +547,64 @@ class ResidentTest : Form
             changeIme = false;
         }
     }
-    void MonitorFirewall()
+    private void MonitorWindowA()
     {
-        // 非アクティブになってから{FWAllowCount}回ループで解除する
-        delayFirewall--;
-        if (FirewallBlockArray != null)
+        if (FirewallBlockArrayA != null)
         {
-            for (int i = 0; i < FirewallBlockArray.Length; i++)
+            for (int i = 0; i < FirewallBlockArrayA.Length; i++)
             {
-                if (!string.IsNullOrEmpty(processName))
+                if (!string.IsNullOrEmpty(foregroundprocessName))
                 {
-                    if (processName.ToLower() == FirewallBlockArray[i].ToLower())
-                    {
-                        delayFirewall = FWAllowInterval;
-                        Console.WriteLine($"{processName} によりFirewallをブロックします。");
-                    }
-                    if (processName.ToLower() == FirewallBlockArray[i].ToLower() & !flagFirewall)
+                    if (foregroundprocessName.ToLower() == FirewallBlockArrayA[i].ToLower() & !flagRanappA)
                     {
                         // アクティブならFirewallでブロックする
+                        Console.WriteLine($"{foregroundprocessName} によりFirewallをブロックします。");
                         Process.Start(FWappPathA, FWargvA);
+                        flagRanappA = true;
                         flagFirewall = true;
-                        icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
+                    }
+                    else if (foregroundprocessName.ToLower() == FirewallBlockArrayA[i].ToLower() & flagRanappA)
+                    {
+                        flagRanappA = true;
                     }
                 }
             }
         }
-        if (delayFirewall == 0)
+    }
+    private void MonitorWindowB()
+    {
+        Console.WriteLine($"{previousprocessName},{foregroundprocessName}");
+        // 非アクティブになってから{FWAllowCount}回ループで解除する
+        if (FirewallBlockArrayB != null)
         {
-            // 非アクティブならFirewallを解除する
-            Process.Start(FWappPathB, FWargvB);
-            flagFirewall = false;
-            delayFirewall = 2147483647;
-            icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+            delayFirewall = FWAllowInterval;
+            flagFirewall = true;
+            flagRanappB = true;
 #if DEBUG
-            Console.WriteLine("時間経過によりFirewallを許可します");
+            Console.WriteLine("Set flagRanappB = true;");
 #endif
         }
     }
-
+    private void RanappB()
+    {
+        delayFirewall--;
+        if (delayFirewall == 0)
+        {
+            // 何日かすると桁あふれするのでリセットする
+            delayFirewall = 2147483647;
+            if (flagRanappB)
+            {
+                // 非アクティブならFirewallを解除する
+                Process.Start(FWappPathB, FWargvB);
+                flagFirewall = false;
+                flagRanappB = false;
+                icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+#if DEBUG
+                Console.WriteLine("時間経過によりFirewallを許可します");
+#endif
+            }
+        }
+    }
     // 半角カナ/全角英数/カタカナ モードを強制的に「ひらがな」モードに変更する
     void MonitorActiveWindow()
     {
@@ -574,6 +639,7 @@ class ResidentTest : Form
         // キーボード入力されたかチェック
         CheckLastKeyInput();
 
+        previousprocessName = foregroundprocessName;
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
         const int nChars = 256;
@@ -584,33 +650,50 @@ class ResidentTest : Form
         // プロセスを取得
         Process process = Process.GetProcessById((int)processId);
         // プロセス名を取得
-        processName = process.ProcessName;
-        Process[] processes = Process.GetProcessesByName(processName);
+        foregroundprocessName = process.ProcessName;
+        Process[] processes = Process.GetProcessesByName(foregroundprocessName);
         // プロセス名を取得
         Process[] array = Process.GetProcesses();
 
         if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
         {
 #if DEBUG
-            Console.WriteLine($"タイトル:{buff} プロセス名:{processName}");
+            Console.WriteLine($"タイトル:{buff} プロセス名:{foregroundprocessName}");
 #endif
             foregroundWindowTitle = buff.ToString();
         }
         else
         {
-            Console.WriteLine($"タイトルを取得できません。タイトル:{buff} プロセス名:{processName}");
+            Console.WriteLine($"タイトルを取得できません。タイトル:{buff} プロセス名:{foregroundprocessName}");
             return;
         }
 
         if (CheckProcessAppArray())
         {
 #if DEBUG
-            Console.WriteLine($"{processName} はAppListに含まれています。");
+            Console.WriteLine($"{foregroundprocessName} はAppListに含まれています。");
 #endif
             icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
             return;
         }
-
+        if (CheckProcessFirewallBlockArrayA())
+        {
+#if DEBUG
+            Console.WriteLine($"{foregroundprocessName} はFirewallBlockArrayAに含まれています。");
+#endif
+            MonitorWindowA();
+        }
+        if (CheckProcessFirewallBlockArrayB())
+        {
+#if DEBUG
+            Console.WriteLine($"{previousprocessName} はFirewallBlockArrayBに含まれています。");
+#endif
+            MonitorWindowB();
+        }
+        else
+        {
+            RanappB();
+        }
         if (foregroundWindowTitle != previousWindowTitle)
         {
             if (ImeModeGlobal)
