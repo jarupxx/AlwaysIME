@@ -551,21 +551,15 @@ class ResidentTest : Form
     {
         if (OnActivatedAppArray != null)
         {
-            for (int i = 0; i < OnActivatedAppArray.Length; i++)
+            if (!string.IsNullOrEmpty(foregroundprocessName))
             {
-                if (!string.IsNullOrEmpty(foregroundprocessName))
+                if (!flagOnActivated)
                 {
-                    if (foregroundprocessName.ToLower() == OnActivatedAppArray[i].ToLower() & !flagOnActivated)
-                    {
-                        Console.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
-                        Process.Start(RanOnActivatedAppPath, RanOnActivatedArgv);
-                        flagOnActivated = true;
-                        flagIconColor = true;
-                    }
-                    else if (foregroundprocessName.ToLower() == OnActivatedAppArray[i].ToLower() & flagOnActivated)
-                    {
-                        flagOnActivated = true;
-                    }
+                    Console.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
+                    Process.Start(RanOnActivatedAppPath, RanOnActivatedArgv);
+                    flagOnActivated = true;
+                    flagIconColor = true;
+                    icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
                 }
             }
         }
@@ -682,6 +676,10 @@ class ResidentTest : Form
             Console.WriteLine($"{foregroundprocessName} はOnActivatedAppListに含まれています");
 #endif
             MonitorOnActivated();
+        }
+        else
+        {
+            flagOnActivated = false;
         }
         if (CheckProcessEnteredBackgroundArray())
         {
