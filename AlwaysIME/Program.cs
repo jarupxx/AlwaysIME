@@ -27,7 +27,7 @@ class MainWindow
         if (createdNew)
         {
             ResidentTest rm = new ResidentTest();
-            rm.InitializeAppArray();
+            rm.InitializeAppConfig();
             System.Windows.Forms.Application.Run();
             mutex.ReleaseMutex();
         }
@@ -45,24 +45,24 @@ class ResidentTest : Form
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
-    static bool flagFirewall = false;
-    static bool flagRanappA = false;
-    static bool flagRanappB = false;
-    static int delayFirewall = 2147483647;
+    static bool flagIconColor = false;
+    static bool flagOnActivated = false;
+    static bool ScheduleRanEnteredBackgroundApp = false;
+    static int delayRanEnteredBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
     private string[] appArray;
     private string[] ImeOffArray;
-    private string[] FirewallBlockArrayA;
-    private string[] FirewallBlockArrayB;
-    private string FWappPathA;
-    private string FWargvA;
-    private string FWappPathB;
-    private string FWargvB;
+    private string[] OnActivatedAppArray;
+    private string[] EnteredBackgroundArray;
+    private string RanOnActivatedAppPath;
+    private string RanOnActivatedArgv;
+    private string RanEnteredBackgroundAppPath;
+    private string FWEnteredBackgroundArgv;
     private int imeInterval = 1000;
     private int SuspendFewInterval = 5;
     private int SuspendInterval = 45;
-    private int FWAllowInterval = 2147483647;
+    private int DelayBackgroundInterval = 2147483647;
     private int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
     IntPtr imwd;
@@ -143,7 +143,7 @@ class ResidentTest : Form
         this.lastInputTime = DateTime.Now;
     }
 
-    public void InitializeAppArray()
+    public void InitializeAppConfig()
     {
         string AlwaysIMEMode = ConfigurationManager.AppSettings["AlwaysIMEMode"];
         if (!string.IsNullOrEmpty(AlwaysIMEMode))
@@ -213,68 +213,68 @@ class ResidentTest : Form
         }
         try
         {
-            FWAllowInterval = int.Parse(ConfigurationManager.AppSettings["FWAllowCount"]);
+            DelayBackgroundInterval = int.Parse(ConfigurationManager.AppSettings["DelayBackgroundCount"]);
         }
         catch (Exception)
         {
             /* Nothing to do */
         }
-        string FirewallBlockListA = ConfigurationManager.AppSettings["FWBlockListA"];
-        if (!string.IsNullOrEmpty(FirewallBlockListA))
+        string OnActivatedAppList = ConfigurationManager.AppSettings["OnActivatedAppList"];
+        if (!string.IsNullOrEmpty(OnActivatedAppList))
         {
-            FirewallBlockArrayA = FirewallBlockListA.Split(',');
+            OnActivatedAppArray = OnActivatedAppList.Split(',');
         }
         else
         {
             /* Nothing to do */
         }
-        FWappPathA = (ConfigurationManager.AppSettings["appPathA"]);
-        if (!string.IsNullOrEmpty(FWappPathA))
+        RanOnActivatedAppPath = (ConfigurationManager.AppSettings["OnActivatedAppPath"]);
+        if (!string.IsNullOrEmpty(RanOnActivatedAppPath))
         {
-            if (!File.Exists(FWappPathA))
+            if (!File.Exists(RanOnActivatedAppPath))
             {
-                System.Windows.Forms.MessageBox.Show("FWappPathA に指定したアプリが見つかりません。");
+                System.Windows.Forms.MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
                 // Firewall機能を無効にする
-                flagRanappA = false;
+                flagOnActivated = false;
             }
         }
         /* else
         {
-            FirewallBlockArrayA = null;
+            OnActivatedAppArray = null;
         } */
         try
         {
-            FWargvA = (ConfigurationManager.AppSettings["argvA"]);
+            RanOnActivatedArgv = (ConfigurationManager.AppSettings["OnActivatedArgv"]);
         }
         catch (Exception)
         {
             /* Nothing to do */
         }
-        string FirewallBlockListB = ConfigurationManager.AppSettings["FWBlockListB"];
-        if (!string.IsNullOrEmpty(FirewallBlockListB))
+        string EnteredBackgroundAppList = ConfigurationManager.AppSettings["EnteredBackgroundAppList"];
+        if (!string.IsNullOrEmpty(EnteredBackgroundAppList))
         {
-            FirewallBlockArrayB = FirewallBlockListB.Split(',');
+            EnteredBackgroundArray = EnteredBackgroundAppList.Split(',');
         }
         else
         {
             /* Nothing to do */
         }
-        FWappPathB = (ConfigurationManager.AppSettings["appPathB"]);
-        if (!string.IsNullOrEmpty(FWappPathB))
+        RanEnteredBackgroundAppPath = (ConfigurationManager.AppSettings["EnteredBackgroundAppPath"]);
+        if (!string.IsNullOrEmpty(RanEnteredBackgroundAppPath))
         {
-            if (!File.Exists(FWappPathB))
+            if (!File.Exists(RanEnteredBackgroundAppPath))
             {
-                System.Windows.Forms.MessageBox.Show("FWappPathB に指定したアプリが見つかりません。");
-                flagRanappB = false;
+                System.Windows.Forms.MessageBox.Show("EnteredBackgroundAppPath に指定したアプリが見つかりません");
+                ScheduleRanEnteredBackgroundApp = false;
             }
         }
         /* else
         {
-            FirewallBlockArrayB = null;
+            EnteredBackgroundArray = null;
         } */
         try
         {
-            FWargvB = (ConfigurationManager.AppSettings["argvB"]);
+            FWEnteredBackgroundArgv = (ConfigurationManager.AppSettings["EnteredBackgroundArgv"]);
         }
         catch (Exception)
         {
@@ -332,7 +332,7 @@ class ResidentTest : Form
     {
         this.timer.Start();
         icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
-        Console.WriteLine("クリックにより再開しました。");
+        Console.WriteLine("クリックにより再開しました");
     }
     private async void SuspendFewMenuItem_Click(object sender, EventArgs e)
     {
@@ -346,14 +346,14 @@ class ResidentTest : Form
     private async Task SuspendAsync(TimeSpan duration)
     {
         icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
-        Console.WriteLine($"{duration}分間無効にします。");
+        Console.WriteLine($"{duration}分間無効にします");
 
         this.timer.Stop();
         await Task.Delay(duration);
         this.timer.Start();
 
         icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
-        Console.WriteLine("再開しました。");
+        Console.WriteLine("再開しました");
     }
     private void ChangeIntervalAndSave(int interval)
     {
@@ -372,7 +372,7 @@ class ResidentTest : Form
     }
     private void SetIcon()
     {
-        if (flagFirewall)
+        if (flagIconColor)
         {
             icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
         }
@@ -409,15 +409,15 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessFirewallBlockArrayA()
+    private bool CheckProcessOnActivatedAppArray()
     {
-        if (FirewallBlockArrayA != null)
+        if (OnActivatedAppArray != null)
         {
             if (!string.IsNullOrEmpty(foregroundprocessName))
             {
-                for (int i = 0; i < FirewallBlockArrayA.Length; i++)
+                for (int i = 0; i < OnActivatedAppArray.Length; i++)
                 {
-                    if (foregroundprocessName.ToLower() == FirewallBlockArrayA[i].ToLower())
+                    if (foregroundprocessName.ToLower() == OnActivatedAppArray[i].ToLower())
                     {
                         return true;
                     }
@@ -426,15 +426,15 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessFirewallBlockArrayB()
+    private bool CheckProcessEnteredBackgroundArray()
     {
-        if (FirewallBlockArrayB != null)
+        if (EnteredBackgroundArray != null)
         {
             if (!string.IsNullOrEmpty(previousprocessName))
             {
-                for (int i = 0; i < FirewallBlockArrayB.Length; i++)
+                for (int i = 0; i < EnteredBackgroundArray.Length; i++)
                 {
-                    if (previousprocessName.ToLower() == FirewallBlockArrayB[i].ToLower())
+                    if (previousprocessName.ToLower() == EnteredBackgroundArray[i].ToLower())
                     {
                         return true;
                     }
@@ -547,60 +547,59 @@ class ResidentTest : Form
             changeIme = false;
         }
     }
-    private void MonitorWindowA()
+    private void MonitorOnActivated()
     {
-        if (FirewallBlockArrayA != null)
+        if (OnActivatedAppArray != null)
         {
-            for (int i = 0; i < FirewallBlockArrayA.Length; i++)
+            for (int i = 0; i < OnActivatedAppArray.Length; i++)
             {
                 if (!string.IsNullOrEmpty(foregroundprocessName))
                 {
-                    if (foregroundprocessName.ToLower() == FirewallBlockArrayA[i].ToLower() & !flagRanappA)
+                    if (foregroundprocessName.ToLower() == OnActivatedAppArray[i].ToLower() & !flagOnActivated)
                     {
-                        // アクティブならFirewallでブロックする
-                        Console.WriteLine($"{foregroundprocessName} によりFirewallをブロックします。");
-                        Process.Start(FWappPathA, FWargvA);
-                        flagRanappA = true;
-                        flagFirewall = true;
+                        Console.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
+                        Process.Start(RanOnActivatedAppPath, RanOnActivatedArgv);
+                        flagOnActivated = true;
+                        flagIconColor = true;
                     }
-                    else if (foregroundprocessName.ToLower() == FirewallBlockArrayA[i].ToLower() & flagRanappA)
+                    else if (foregroundprocessName.ToLower() == OnActivatedAppArray[i].ToLower() & flagOnActivated)
                     {
-                        flagRanappA = true;
+                        flagOnActivated = true;
                     }
                 }
             }
         }
     }
-    private void MonitorWindowB()
+    private void MonitorEnteredBackground()
     {
         Console.WriteLine($"{previousprocessName},{foregroundprocessName}");
-        // 非アクティブになってから{FWAllowCount}回ループで解除する
-        if (FirewallBlockArrayB != null)
+        // 非アクティブになってから{DelayBackgroundCount}回ループで解除する
+        if (EnteredBackgroundArray != null)
         {
-            delayFirewall = FWAllowInterval;
-            flagFirewall = true;
-            flagRanappB = true;
+            delayRanEnteredBackgroundApp = DelayBackgroundInterval;
+            flagIconColor = true;
+            ScheduleRanEnteredBackgroundApp = true;
 #if DEBUG
-            Console.WriteLine("Set flagRanappB = true;");
+            Console.WriteLine("Set ScheduleRanEnteredBackgroundApp = true;");
 #endif
         }
     }
-    private void RanappB()
+    private void RanEnteredBackgroundApp()
     {
-        delayFirewall--;
-        if (delayFirewall == 0)
+        delayRanEnteredBackgroundApp--;
+        if (delayRanEnteredBackgroundApp == 0)
         {
             // 何日かすると桁あふれするのでリセットする
-            delayFirewall = 2147483647;
-            if (flagRanappB)
+            delayRanEnteredBackgroundApp = 2147483647;
+            if (ScheduleRanEnteredBackgroundApp)
             {
                 // 非アクティブならFirewallを解除する
-                Process.Start(FWappPathB, FWargvB);
-                flagFirewall = false;
-                flagRanappB = false;
+                Process.Start(RanEnteredBackgroundAppPath, FWEnteredBackgroundArgv);
+                flagIconColor = false;
+                ScheduleRanEnteredBackgroundApp = false;
                 icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
 #if DEBUG
-                Console.WriteLine("時間経過によりFirewallを許可します");
+                Console.WriteLine("時間経過により連携アプリが起動します");
 #endif
             }
         }
@@ -636,9 +635,10 @@ class ResidentTest : Form
             return;
         }
 
-        // キーボード入力されたかチェック
+        // キーボード未入力ならIMEの状態を復元する
         CheckLastKeyInput();
 
+        // プロセスの変更を追跡するために保存する
         previousprocessName = foregroundprocessName;
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
@@ -671,28 +671,28 @@ class ResidentTest : Form
         if (CheckProcessAppArray())
         {
 #if DEBUG
-            Console.WriteLine($"{foregroundprocessName} はAppListに含まれています。");
+            Console.WriteLine($"{foregroundprocessName} はAppListに含まれています");
 #endif
             icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
             return;
         }
-        if (CheckProcessFirewallBlockArrayA())
+        if (CheckProcessOnActivatedAppArray())
         {
 #if DEBUG
-            Console.WriteLine($"{foregroundprocessName} はFirewallBlockArrayAに含まれています。");
+            Console.WriteLine($"{foregroundprocessName} はOnActivatedAppListに含まれています");
 #endif
-            MonitorWindowA();
+            MonitorOnActivated();
         }
-        if (CheckProcessFirewallBlockArrayB())
+        if (CheckProcessEnteredBackgroundArray())
         {
 #if DEBUG
-            Console.WriteLine($"{previousprocessName} はFirewallBlockArrayBに含まれています。");
+            Console.WriteLine($"{previousprocessName} はEnteredBackgroundAppListに含まれています");
 #endif
-            MonitorWindowB();
+            MonitorEnteredBackground();
         }
         else
         {
-            RanappB();
+            RanEnteredBackgroundApp();
         }
         if (foregroundWindowTitle != previousWindowTitle)
         {
