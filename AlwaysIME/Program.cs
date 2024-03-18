@@ -649,19 +649,6 @@ class ResidentTest : Form
         // プロセス名を取得
         Process[] array = Process.GetProcesses();
 
-        if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
-        {
-#if DEBUG
-            Console.WriteLine($"タイトル:{buff} プロセス名:{foregroundprocessName}");
-#endif
-            foregroundWindowTitle = buff.ToString();
-        }
-        else
-        {
-            Console.WriteLine($"タイトルを取得できません。タイトル:{buff} プロセス名:{foregroundprocessName}");
-            return;
-        }
-
         if (CheckProcessAppArray())
         {
 #if DEBUG
@@ -691,6 +678,18 @@ class ResidentTest : Form
         else
         {
             RanEnteredBackgroundApp();
+        }
+        if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
+        {
+#if DEBUG
+            Console.WriteLine($"タイトル:{buff} プロセス名:{foregroundprocessName}");
+#endif
+            foregroundWindowTitle = buff.ToString();
+        }
+        else
+        {
+            Console.WriteLine($"タイトルを取得できません。タイトル:{buff} プロセス名:{foregroundprocessName}");
+            return;
         }
         if (foregroundWindowTitle != previousWindowTitle)
         {
