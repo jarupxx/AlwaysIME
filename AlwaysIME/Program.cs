@@ -310,31 +310,38 @@ class ResidentTest : Form
         ContextMenuStrip menu = new ContextMenuStrip();
 
         ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
-        suspendFewMenuItem.Text = "少し無効";
+        suspendFewMenuItem.Text = "少し無効(&S)";
         suspendFewMenuItem.Click += new EventHandler(SuspendFewMenuItem_Click);
         menu.Items.Add(suspendFewMenuItem);
         ToolStripMenuItem suspendMenuItem = new ToolStripMenuItem();
-        suspendMenuItem.Text = "しばらく無効";
+        suspendMenuItem.Text = "しばらく無効(&P)";
         suspendMenuItem.Click += new EventHandler(SuspendMenuItem_Click);
         menu.Items.Add(suspendMenuItem);
         ToolStripMenuItem resumeMenuItem = new ToolStripMenuItem();
-        resumeMenuItem.Text = "更新間隔";
+        resumeMenuItem.Text = "再度有効(&R)";
         resumeMenuItem.Click += new EventHandler(ResumeMenuItem_Click);
         menu.Items.Add(resumeMenuItem);
-        ToolStripMenuItem menuItem500 = new ToolStripMenuItem();
-        menuItem500.Text = "> 500 ms";
+
+        ToolStripSeparator separator = new ToolStripSeparator();
+        menu.Items.Add(separator);
+
+        ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新時間");
+        ToolStripMenuItem menuItem500 = new ToolStripMenuItem("500 ms");
         menuItem500.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(500));
-        menu.Items.Add(menuItem500);
-        ToolStripMenuItem menuItem1000 = new ToolStripMenuItem();
-        menuItem1000.Text = "> 1000 ms";
+        ToolStripMenuItem menuItem1000 = new ToolStripMenuItem("1000 ms");
         menuItem1000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(1000));
-        menu.Items.Add(menuItem1000);
-        ToolStripMenuItem menuItem2000 = new ToolStripMenuItem();
-        menuItem2000.Text = "> 2000 ms";
+        ToolStripMenuItem menuItem2000 = new ToolStripMenuItem("2000 ms");
         menuItem2000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(2000));
-        menu.Items.Add(menuItem2000);
+        updateTimeMenuItem.DropDownItems.Add(menuItem500);
+        updateTimeMenuItem.DropDownItems.Add(menuItem1000);
+        updateTimeMenuItem.DropDownItems.Add(menuItem2000);
+        menu.Items.Add(updateTimeMenuItem);
+
+        ToolStripSeparator separator2 = new ToolStripSeparator();
+        menu.Items.Add(separator2);
+
         ToolStripMenuItem menuItem = new ToolStripMenuItem();
-        menuItem.Text = "&終了";
+        menuItem.Text = "常駐の終了(&X)";
         menuItem.Click += new EventHandler(Close_Click);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
