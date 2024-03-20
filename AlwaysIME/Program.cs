@@ -166,7 +166,7 @@ class ResidentTest : Form
         string appList = ConfigurationManager.AppSettings["AppList"];
         if (!string.IsNullOrEmpty(appList))
         {
-            appArray = appList.Split(',');
+            appArray = appList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         else
         {
@@ -175,7 +175,7 @@ class ResidentTest : Form
         string ImeOffList = ConfigurationManager.AppSettings["ImeOffList"];
         if (!string.IsNullOrEmpty(ImeOffList))
         {
-            ImeOffArray = ImeOffList.Split(',');
+            ImeOffArray = ImeOffList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         else
         {
@@ -184,7 +184,7 @@ class ResidentTest : Form
         string ImeOffTitle = ConfigurationManager.AppSettings["ImeOffTitle"];
         if (!string.IsNullOrEmpty(ImeOffTitle))
         {
-            ImeOffTitleArray = ImeOffTitle.Split(',');
+            ImeOffTitleArray = ImeOffTitle.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         else
         {
@@ -233,7 +233,7 @@ class ResidentTest : Form
         string OnActivatedAppList = ConfigurationManager.AppSettings["OnActivatedAppList"];
         if (!string.IsNullOrEmpty(OnActivatedAppList))
         {
-            OnActivatedAppArray = OnActivatedAppList.Split(',');
+            OnActivatedAppArray = OnActivatedAppList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         else
         {
@@ -264,7 +264,7 @@ class ResidentTest : Form
         string EnteredBackgroundAppList = ConfigurationManager.AppSettings["EnteredBackgroundAppList"];
         if (!string.IsNullOrEmpty(EnteredBackgroundAppList))
         {
-            EnteredBackgroundArray = EnteredBackgroundAppList.Split(',');
+            EnteredBackgroundArray = EnteredBackgroundAppList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         else
         {
