@@ -147,10 +147,10 @@ class ResidentTest : Form
 
     public void InitializeAppConfig()
     {
-        string AlwaysIMEMode = ConfigurationManager.AppSettings["AlwaysIMEMode"];
-        if (!string.IsNullOrEmpty(AlwaysIMEMode))
+        string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            if (AlwaysIMEMode.ToLower().CompareTo("off") == 0)
+            if (buff.ToLower().CompareTo("off") == 0)
             {
                 ImeModeGlobal = true;
             }
@@ -163,133 +163,98 @@ class ResidentTest : Form
         {
             ImeModeGlobal = false;
         }
-        string appList = ConfigurationManager.AppSettings["AppList"];
-        if (!string.IsNullOrEmpty(appList))
+        buff = ConfigurationManager.AppSettings["AppList"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            appArray = appList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            appArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
-        else
+        buff = ConfigurationManager.AppSettings["ImeOffList"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            /* Nothing to do */
+            ImeOffArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
-        string ImeOffList = ConfigurationManager.AppSettings["ImeOffList"];
-        if (!string.IsNullOrEmpty(ImeOffList))
+        buff = ConfigurationManager.AppSettings["ImeOffTitle"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            ImeOffArray = ImeOffList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            ImeOffTitleArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
-        else
+        buff = ConfigurationManager.AppSettings["intervalTime"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            /* Nothing to do */
+            imeInterval = int.Parse(buff);
         }
-        string ImeOffTitle = ConfigurationManager.AppSettings["ImeOffTitle"];
-        if (!string.IsNullOrEmpty(ImeOffTitle))
+        buff = ConfigurationManager.AppSettings["SuspendFewTime"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            ImeOffTitleArray = ImeOffTitle.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            SuspendFewInterval = int.Parse(buff);
         }
-        else
+        buff = ConfigurationManager.AppSettings["SuspendTime"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            /* Nothing to do */
+            SuspendInterval = int.Parse(buff);
         }
-        try
+        buff = ConfigurationManager.AppSettings["NoKeyInputTime"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            imeInterval = int.Parse(ConfigurationManager.AppSettings["intervalTime"]);
+            noKeyInputInterval = (int)(float.Parse(buff) * 60 * 1000);
         }
-        catch (Exception)
+        buff = ConfigurationManager.AppSettings["DelayBackgroundCount"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            /* Nothing to do */
+            DelayBackgroundInterval = int.Parse(buff);
         }
-        try
+        buff = ConfigurationManager.AppSettings["OnActivatedAppList"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            SuspendFewInterval = int.Parse(ConfigurationManager.AppSettings["SuspendFewTime"]);
+            OnActivatedAppArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
-        catch (Exception)
+        buff = (ConfigurationManager.AppSettings["OnActivatedAppPath"]);
+        if (!string.IsNullOrEmpty(buff))
         {
-            /* Nothing to do */
-        }
-        try
-        {
-            SuspendInterval = int.Parse(ConfigurationManager.AppSettings["SuspendTime"]);
-        }
-        catch (Exception)
-        {
-            /* Nothing to do */
-        }
-        try
-        {
-            noKeyInputInterval = (int)(float.Parse(ConfigurationManager.AppSettings["NoKeyInputTime"]) * 60 * 1000);
-        }
-        catch (Exception)
-        {
-            /* Nothing to do */
-        }
-        try
-        {
-            DelayBackgroundInterval = int.Parse(ConfigurationManager.AppSettings["DelayBackgroundCount"]);
-        }
-        catch (Exception)
-        {
-            /* Nothing to do */
-        }
-        string OnActivatedAppList = ConfigurationManager.AppSettings["OnActivatedAppList"];
-        if (!string.IsNullOrEmpty(OnActivatedAppList))
-        {
-            OnActivatedAppArray = OnActivatedAppList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-        }
-        else
-        {
-            /* Nothing to do */
-        }
-        RanOnActivatedAppPath = (ConfigurationManager.AppSettings["OnActivatedAppPath"]);
-        if (!string.IsNullOrEmpty(RanOnActivatedAppPath))
-        {
-            if (!File.Exists(RanOnActivatedAppPath))
+            if (!File.Exists(buff))
             {
                 System.Windows.Forms.MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
-                // Firewall機能を無効にする
-                flagOnActivated = false;
+            }
+            else
+            {
+                RanOnActivatedAppPath = buff;
             }
         }
         /* else
         {
             OnActivatedAppArray = null;
         } */
-        try
+        buff = ConfigurationManager.AppSettings["OnActivatedArgv"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            RanOnActivatedArgv = (ConfigurationManager.AppSettings["OnActivatedArgv"]);
+            RanOnActivatedArgv = buff;
         }
-        catch (Exception)
+        buff = ConfigurationManager.AppSettings["EnteredBackgroundAppList"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            /* Nothing to do */
+            EnteredBackgroundArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
-        string EnteredBackgroundAppList = ConfigurationManager.AppSettings["EnteredBackgroundAppList"];
-        if (!string.IsNullOrEmpty(EnteredBackgroundAppList))
+        buff = (ConfigurationManager.AppSettings["EnteredBackgroundAppPath"]);
+        if (!string.IsNullOrEmpty(buff))
         {
-            EnteredBackgroundArray = EnteredBackgroundAppList.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-        }
-        else
-        {
-            /* Nothing to do */
-        }
-        RanEnteredBackgroundAppPath = (ConfigurationManager.AppSettings["EnteredBackgroundAppPath"]);
-        if (!string.IsNullOrEmpty(RanEnteredBackgroundAppPath))
-        {
-            if (!File.Exists(RanEnteredBackgroundAppPath))
+            if (!File.Exists(buff))
             {
                 System.Windows.Forms.MessageBox.Show("EnteredBackgroundAppPath に指定したアプリが見つかりません");
                 ScheduleRanEnteredBackgroundApp = false;
+            }
+            else
+            {
+                RanEnteredBackgroundAppPath = buff;
             }
         }
         /* else
         {
             EnteredBackgroundArray = null;
         } */
-        try
+        buff = ConfigurationManager.AppSettings["EnteredBackgroundArgv"];
+        if (!string.IsNullOrEmpty(buff))
         {
-            FWEnteredBackgroundArgv = (ConfigurationManager.AppSettings["EnteredBackgroundArgv"]);
-        }
-        catch (Exception)
-        {
-            /* Nothing to do */
+            FWEnteredBackgroundArgv = buff;
         }
     }
 
