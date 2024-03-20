@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -53,6 +54,7 @@ class ResidentTest : Form
     private string foregroundWindowTitle;
     private string[] appArray;
     private string[] ImeOffArray;
+    private string[] ImeOffTitleArray;
     private string[] OnActivatedAppArray;
     private string[] EnteredBackgroundArray;
     private string RanOnActivatedAppPath;
@@ -174,6 +176,15 @@ class ResidentTest : Form
         if (!string.IsNullOrEmpty(ImeOffList))
         {
             ImeOffArray = ImeOffList.Split(',');
+        }
+        else
+        {
+            /* Nothing to do */
+        }
+        string ImeOffTitle = ConfigurationManager.AppSettings["ImeOffTitle"];
+        if (!string.IsNullOrEmpty(ImeOffTitle))
+        {
+            ImeOffTitleArray = ImeOffTitle.Split(',');
         }
         else
         {
@@ -402,6 +413,20 @@ class ResidentTest : Form
             for (int i = 0; i < ImeOffArray.Length; i++)
             {
                 if (foregroundprocessName.ToLower() == ImeOffArray[i].ToLower())
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    private bool CheckProcessImeOffTitleArray()
+    {
+        if (ImeOffTitleArray != null)
+        {
+            for (int i = 0; i < ImeOffTitleArray.Length; i++)
+            {
+                if (Regex.IsMatch(foregroundWindowTitle, ImeOffTitleArray[i]))
                 {
                     return true;
                 }
@@ -699,6 +724,10 @@ class ResidentTest : Form
                 {
                     SetImeOffList();
                 }
+                else if (CheckProcessImeOffTitleArray())
+                {
+                    SetImeOffList();
+                }
                 else
                 {
                     SetImeGlobal();
@@ -707,6 +736,10 @@ class ResidentTest : Form
             if (!ImeModeGlobal)
             {
                 if (CheckProcessImeOffArray())
+                {
+                    SetImeOffList();
+                }
+                else if (CheckProcessImeOffTitleArray())
                 {
                     SetImeOffList();
                 }
