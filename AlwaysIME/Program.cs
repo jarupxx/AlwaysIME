@@ -61,7 +61,7 @@ class ResidentTest : Form
     private string RanOnActivatedArgv;
     private string RanEnteredBackgroundAppPath;
     private string FWEnteredBackgroundArgv;
-    private int imeInterval = 1000;
+    private int imeInterval = 500;
     private int SuspendFewInterval = 5;
     private int SuspendInterval = 45;
     private int DelayBackgroundInterval = 2147483647;
@@ -291,15 +291,15 @@ class ResidentTest : Form
         menu.Items.Add(separator);
 
         ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新時間");
+        ToolStripMenuItem menuItem250 = new ToolStripMenuItem("250 ms");
+        menuItem250.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(250));
         ToolStripMenuItem menuItem500 = new ToolStripMenuItem("500 ms");
         menuItem500.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(500));
         ToolStripMenuItem menuItem1000 = new ToolStripMenuItem("1000 ms");
         menuItem1000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(1000));
-        ToolStripMenuItem menuItem2000 = new ToolStripMenuItem("2000 ms");
-        menuItem2000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(2000));
+        updateTimeMenuItem.DropDownItems.Add(menuItem250);
         updateTimeMenuItem.DropDownItems.Add(menuItem500);
         updateTimeMenuItem.DropDownItems.Add(menuItem1000);
-        updateTimeMenuItem.DropDownItems.Add(menuItem2000);
         menu.Items.Add(updateTimeMenuItem);
 
         ToolStripSeparator separator2 = new ToolStripSeparator();
