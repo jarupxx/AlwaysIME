@@ -407,11 +407,14 @@ class ResidentTest : Form
     {
         if (List[param] != null)
         {
-            for (int i = 0; i < List[param].Length; i++)
+            if (!string.IsNullOrEmpty(foregroundprocessName))
             {
-                if (foregroundprocessName.ToLower() == List[param][i].ToLower())
+                for (int i = 0; i < List[param].Length; i++)
                 {
-                    return true;
+                    if (foregroundprocessName.ToLower() == List[param][i].ToLower())
+                    {
+                        return true;
+                    }
                 }
             }
         }
