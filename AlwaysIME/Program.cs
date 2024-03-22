@@ -431,7 +431,7 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessOnActivatedAppArray(int param)
+    private bool CheckforegroundprocessNameNull(int param)
     {
         if (List[param] != null)
         {
@@ -804,7 +804,7 @@ class ResidentTest : Form
             icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
             return;
         }
-        if (CheckProcessOnActivatedAppArray(OnActivatedAppArray))
+        if (CheckforegroundprocessNameNull(OnActivatedAppArray))
         {
 #if DEBUG
             Console.WriteLine($"{foregroundprocessName} はOnActivatedAppListに含まれています");
