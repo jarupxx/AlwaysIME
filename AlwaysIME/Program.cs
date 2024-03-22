@@ -59,7 +59,7 @@ class ResidentTest : Form
     const int appArray = 1;
     const int ImeOffArray = 2;
     const int ImeOffTitleArray = 3;
-    const int ZenkakuSpaceTitleArray = 4;
+    const int SpaceTitleArray = 4;
     const int OnActivatedAppArray = 5;
     const int EnteredBackgroundArray = 6;
     private string RanOnActivatedAppPath;
@@ -67,6 +67,7 @@ class ResidentTest : Form
     private string RanEnteredBackgroundAppPath;
     private string FWEnteredBackgroundArgv;
     private int imeInterval = 500;
+    private int SetSpaceMode = 0;
     private int SuspendFewInterval = 5;
     private int SuspendInterval = 45;
     private int DelayBackgroundInterval = 2147483647;
@@ -166,7 +167,7 @@ class ResidentTest : Form
         List[appArray] = null;
         List[ImeOffArray] = null;
         List[ImeOffTitleArray] = null;
-        List[ZenkakuSpaceTitleArray] = null;
+        List[SpaceTitleArray] = null;
         List[OnActivatedAppArray] = null;
         List[EnteredBackgroundArray] = null;
         string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
@@ -200,11 +201,20 @@ class ResidentTest : Form
         {
             List[ImeOffTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
-        buff = ConfigurationManager.AppSettings["ZenkakuSpaceTitle"];
+        buff = ConfigurationManager.AppSettings["SpaceMode"];
+        DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
         if (!string.IsNullOrEmpty(buff))
         {
-            List[ZenkakuSpaceTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
+            SetSpaceMode = int.Parse(buff);
+            buff = ConfigurationManager.AppSettings["SpaceTitle"];
+            if (!string.IsNullOrEmpty(buff))
+            {
+                List[SpaceTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            }
+        }
+        else
+        {
+            SetSpaceMode = DefaultSpaceWidth;
         }
         buff = ConfigurationManager.AppSettings["intervalTime"];
         if (!string.IsNullOrEmpty(buff))
@@ -435,13 +445,13 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessZenkakuSpaceTitleArray()
+    private bool CheckProcessSpaceTitleArray()
     {
-        if (List[ZenkakuSpaceTitleArray] != null)
+        if (List[SpaceTitleArray] != null)
         {
-            for (int i = 0; i < List[ZenkakuSpaceTitleArray].Length; i++)
+            for (int i = 0; i < List[SpaceTitleArray].Length; i++)
             {
-                if (Regex.IsMatch(foregroundWindowTitle, List[ZenkakuSpaceTitleArray][i]))
+                if (Regex.IsMatch(foregroundWindowTitle, List[SpaceTitleArray][i]))
                 {
                     return true;
                 }
@@ -552,13 +562,27 @@ class ResidentTest : Form
     }
     private void SetInputSpaceList()
     {
-        int newValue = IME_FULL_WIDTH_SPACE;
+        int newValue = SetSpaceMode;
         if (newValue != previousSpaceWidth)
         {
             if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
             {
 #if DEBUG
-                Console.WriteLine($"常に全角スペースにしました");
+                switch (SetSpaceMode)
+                {
+                    case 0:
+                        Console.WriteLine($"スペースを現在の入力モードにしました");
+                        break;
+                    case 1:
+                        Console.WriteLine($"スペースを常に全角にしました");
+                        break;
+                    case 2:
+                        Console.WriteLine($"スペースを常に半角にしました");
+                        break;
+                    default:
+                        /* Nothing to do */
+                        break;
+                }
 #endif
                 previousSpaceWidth = newValue;
             }
@@ -851,7 +875,7 @@ class ResidentTest : Form
                 else
                 {
                     SetImeGlobal();
-                    if (CheckProcessZenkakuSpaceTitleArray())
+                    if (CheckProcessSpaceTitleArray())
                     {
                         SetInputSpaceList();
                     }
@@ -874,7 +898,7 @@ class ResidentTest : Form
                 else
                 {
                     SetImePreset();
-                    if (CheckProcessZenkakuSpaceTitleArray())
+                    if (CheckProcessSpaceTitleArray())
                     {
                         SetInputSpaceList();
                     }
