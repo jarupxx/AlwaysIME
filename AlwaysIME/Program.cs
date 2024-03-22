@@ -434,23 +434,6 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckforegroundprocessNameNull(int param)
-    {
-        if (List[param] != null)
-        {
-            if (!string.IsNullOrEmpty(foregroundprocessName))
-            {
-                for (int i = 0; i < List[param].Length; i++)
-                {
-                    if (foregroundprocessName.ToLower() == List[param][i].ToLower())
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
     private bool CheckpreviousprocessName(int param)
     {
         if (List[param] != null)
@@ -807,7 +790,7 @@ class ResidentTest : Form
             icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
             return;
         }
-        if (CheckforegroundprocessNameNull(OnActivatedAppArray))
+        if (CheckforegroundprocessName(OnActivatedAppArray))
         {
 #if DEBUG
             Console.WriteLine($"{foregroundprocessName} はOnActivatedAppListに含まれています");
