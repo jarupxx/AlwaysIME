@@ -1,3 +1,4 @@
+using Microsoft.Win32;
 using System;
 using System.Configuration;
 using System.Diagnostics;
@@ -43,6 +44,7 @@ class ResidentTest : Form
     private int iconsize;
     static string previousWindowTitle;
     static string previousprocessName;
+    static int previousSpaceWidth;
     static bool ImeModeGlobal = true;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
@@ -56,6 +58,7 @@ class ResidentTest : Form
     private string[] appArray;
     private string[] ImeOffArray;
     private string[] ImeOffTitleArray;
+    private string[] ZenkakuSpaceTitleArray;
     private string[] OnActivatedAppArray;
     private string[] EnteredBackgroundArray;
     private string RanOnActivatedAppPath;
@@ -71,6 +74,7 @@ class ResidentTest : Form
     IntPtr imwd;
     int imeConvMode = 0;
     bool imeEnabled = false;
+    int DefaultSpaceWidth;
 
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
@@ -135,6 +139,16 @@ class ResidentTest : Form
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
     // 27 :   全角カナ                     0001 1011
 
+    const string keyPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
+    const string valueName = "InputSpace";
+    const RegistryValueKind valueType = RegistryValueKind.DWord;
+    const int IME_AUTO_WIDTH_SPACE = 0;
+    const int IME_FULL_WIDTH_SPACE = 1;
+    const int IME_HALF_WIDTH_SPACE = 2;
+    // 0: 現在の入力モード
+    // 1: 常に全角
+    // 2: 常に半角
+
     public ResidentTest()
     {
         this.ShowInTaskbar = false;
@@ -178,6 +192,12 @@ class ResidentTest : Form
         if (!string.IsNullOrEmpty(buff))
         {
             ImeOffTitleArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+        }
+        buff = ConfigurationManager.AppSettings["ZenkakuSpaceTitle"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            ZenkakuSpaceTitleArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
         }
         buff = ConfigurationManager.AppSettings["intervalTime"];
         if (!string.IsNullOrEmpty(buff))
@@ -261,6 +281,7 @@ class ResidentTest : Form
 
     private void Close_Click(object sender, EventArgs e)
     {
+        SetDefaultSpace();
         icon.Visible = false;
         icon.Dispose();
         System.Windows.Forms.Application.Exit();
@@ -407,6 +428,20 @@ class ResidentTest : Form
         }
         return false;
     }
+    private bool CheckProcessZenkakuSpaceTitleArray()
+    {
+        if (ZenkakuSpaceTitleArray != null)
+        {
+            for (int i = 0; i < ZenkakuSpaceTitleArray.Length; i++)
+            {
+                if (Regex.IsMatch(foregroundWindowTitle, ZenkakuSpaceTitleArray[i]))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     private bool CheckProcessOnActivatedAppArray()
     {
         if (OnActivatedAppArray != null)
@@ -508,7 +543,42 @@ class ResidentTest : Form
             }
         }
     }
-
+    private void SetInputSpaceList()
+    {
+        int newValue = IME_FULL_WIDTH_SPACE;
+        if (newValue != previousSpaceWidth)
+        {
+            if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
+            {
+#if DEBUG
+                Console.WriteLine($"常に全角スペースにしました");
+#endif
+                previousSpaceWidth = newValue;
+            }
+            else
+            {
+                Console.WriteLine("Failed to write registory.");
+            }
+        }
+    }
+    private void SetDefaultSpace()
+    {
+        int newValue = DefaultSpaceWidth;
+        if (newValue != previousSpaceWidth)
+        {
+            if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
+            {
+#if DEBUG
+                Console.WriteLine($"スペースをデフォルトに戻しました");
+#endif
+                previousSpaceWidth = newValue;
+            }
+            else
+            {
+                Console.WriteLine("Failed to write registory.");
+            }
+        }
+    }
     private void SetImeOffList()
     {
         // previousWindowTitle：更新 previousimeEnabled：そのまま
@@ -595,6 +665,40 @@ class ResidentTest : Form
 #endif
             }
         }
+    }
+    static object ReadRegistryValue(RegistryHive hive, string keyPath, string valueName, RegistryValueKind valueType)
+    {
+        using (var regKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default).OpenSubKey(keyPath))
+        {
+            if (regKey != null)
+            {
+                object value = regKey.GetValue(valueName, null);
+                if (value != null && regKey.GetValueKind(valueName) == valueType)
+                {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+    static bool WriteRegistryValue(RegistryHive hive, string keyPath, string valueName, object value, RegistryValueKind valueType)
+    {
+        try
+        {
+            using (var regKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default).CreateSubKey(keyPath))
+            {
+                if (regKey != null)
+                {
+                    regKey.SetValue(valueName, value, valueType);
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error writing registry value: {ex.Message}");
+        }
+        return false;
     }
     // 半角カナ/全角英数/カタカナ モードを強制的に「ひらがな」モードに変更する
     void MonitorActiveWindow()
@@ -740,6 +844,14 @@ class ResidentTest : Form
                 else
                 {
                     SetImeGlobal();
+                    if (CheckProcessZenkakuSpaceTitleArray())
+                    {
+                        SetInputSpaceList();
+                    }
+                    else
+                    {
+                        SetDefaultSpace();
+                    }
                 }
             }
             if (!ImeModeGlobal)
@@ -755,6 +867,14 @@ class ResidentTest : Form
                 else
                 {
                     SetImePreset();
+                    if (CheckProcessZenkakuSpaceTitleArray())
+                    {
+                        SetInputSpaceList();
+                    }
+                    else
+                    {
+                        SetDefaultSpace();
+                    }
                 }
             }
             SetIcon();
