@@ -431,20 +431,6 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessSpaceTitleArray(int param)
-    {
-        if (List[param] != null)
-        {
-            for (int i = 0; i < List[param].Length; i++)
-            {
-                if (Regex.IsMatch(foregroundWindowTitle, List[param][i]))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
     private bool CheckProcessOnActivatedAppArray(int param)
     {
         if (List[param] != null)
@@ -861,7 +847,7 @@ class ResidentTest : Form
                 else
                 {
                     SetImeGlobal();
-                    if (CheckProcessSpaceTitleArray(SpaceTitleArray))
+                    if (CheckProcessImeOffTitleArray(SpaceTitleArray))
                     {
                         SetInputSpaceList();
                     }
@@ -884,7 +870,7 @@ class ResidentTest : Form
                 else
                 {
                     SetImePreset();
-                    if (CheckProcessSpaceTitleArray(SpaceTitleArray))
+                    if (CheckProcessImeOffTitleArray(SpaceTitleArray))
                     {
                         SetInputSpaceList();
                     }
