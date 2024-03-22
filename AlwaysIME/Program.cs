@@ -417,7 +417,7 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessImeOffTitleArray(int param)
+    private bool CheckforegroundWindowTitleRegex(int param)
     {
         if (List[param] != null)
         {
@@ -840,14 +840,14 @@ class ResidentTest : Form
                 {
                     SetImeOffList();
                 }
-                else if (CheckProcessImeOffTitleArray(ImeOffTitleArray))
+                else if (CheckforegroundWindowTitleRegex(ImeOffTitleArray))
                 {
                     SetImeOffList();
                 }
                 else
                 {
                     SetImeGlobal();
-                    if (CheckProcessImeOffTitleArray(SpaceTitleArray))
+                    if (CheckforegroundWindowTitleRegex(SpaceTitleArray))
                     {
                         SetInputSpaceList();
                     }
@@ -863,14 +863,14 @@ class ResidentTest : Form
                 {
                     SetImeOffList();
                 }
-                else if (CheckProcessImeOffTitleArray(ImeOffTitleArray))
+                else if (CheckforegroundWindowTitleRegex(ImeOffTitleArray))
                 {
                     SetImeOffList();
                 }
                 else
                 {
                     SetImePreset();
-                    if (CheckProcessImeOffTitleArray(SpaceTitleArray))
+                    if (CheckforegroundWindowTitleRegex(SpaceTitleArray))
                     {
                         SetInputSpaceList();
                     }
