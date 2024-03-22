@@ -56,7 +56,7 @@ class ResidentTest : Form
     static string foregroundprocessName;
     private string foregroundWindowTitle;
     private string[][] List = new string[6 + 1][];
-    const int appArray = 1;
+    const int PassArray = 1;
     const int ImeOffArray = 2;
     const int ImeOffTitleArray = 3;
     const int SpaceTitleArray = 4;
@@ -164,7 +164,7 @@ class ResidentTest : Form
 
     public void InitializeAppConfig()
     {
-        List[appArray] = null;
+        List[PassArray] = null;
         List[ImeOffArray] = null;
         List[ImeOffTitleArray] = null;
         List[SpaceTitleArray] = null;
@@ -186,10 +186,10 @@ class ResidentTest : Form
         {
             ImeModeGlobal = false;
         }
-        buff = ConfigurationManager.AppSettings["AppList"];
+        buff = ConfigurationManager.AppSettings["PassList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[appArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[PassArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["ImeOffList"];
         if (!string.IsNullOrEmpty(buff))
@@ -782,7 +782,7 @@ class ResidentTest : Form
             return;
         }
 
-        if (CheckforegroundprocessName(appArray))
+        if (CheckforegroundprocessName(PassArray))
         {
 #if DEBUG
             Console.WriteLine($"{foregroundprocessName} はAppListに含まれています");
