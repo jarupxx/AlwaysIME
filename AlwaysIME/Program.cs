@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -329,7 +330,7 @@ class ResidentTest : Form
     private async Task SuspendAsync(TimeSpan duration)
     {
         icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
-        Console.WriteLine($"{duration}分間無効にします");
+        Console.WriteLine($"{duration.TotalMinutes}分間無効にします({DateTime.Now + duration}まで)");
 
         this.timer.Stop();
         await Task.Delay(duration);
@@ -633,18 +634,60 @@ class ResidentTest : Form
         previousprocessName = foregroundprocessName;
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
-        const int nChars = 256;
-        var buff = new System.Text.StringBuilder(nChars);
-        // プロセスIDを取得
-        uint processId;
-        GetWindowThreadProcessId(foregroundWindowHandle, out processId);
-        // プロセスを取得
-        Process process = Process.GetProcessById((int)processId);
-        // プロセス名を取得
-        foregroundprocessName = process.ProcessName;
-        Process[] processes = Process.GetProcessesByName(foregroundprocessName);
-        // プロセス名を取得
-        Process[] array = Process.GetProcesses();
+        if (foregroundWindowHandle != IntPtr.Zero)
+        {
+            try
+            {
+                // プロセスIDを取得
+                if (GetWindowThreadProcessId(foregroundWindowHandle, out uint processId) != 0)
+                {
+                    try
+                    {
+                        // プロセスを取得
+                        Process process = Process.GetProcessById((int)processId);
+                        // プロセス名を取得
+                        foregroundprocessName = process.ProcessName;
+                        // ウィンドウのタイトルを取得
+                        const int nChars = 256;
+                        StringBuilder titleBuilder = new StringBuilder(nChars);
+                        if (GetWindowText(foregroundWindowHandle, titleBuilder, titleBuilder.Capacity) > 0)
+                        {
+                            foregroundWindowTitle = titleBuilder.ToString();
+#if DEBUG
+                            Console.WriteLine($"タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+#endif
+                        }
+                        else
+                        {
+                            foregroundWindowTitle = "";
+                            Console.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+                            /* タイトルが空欄のプロセスが存在するので後でreturn;をする */
+                            // return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("GetProcessById Failed: " + ex.Message);
+                        return;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("GetWindowThreadProcessId Failed");
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Getting window information Failed: " + ex.Message);
+                return;
+            }
+        }
+        else
+        {
+            Console.WriteLine("GetForegroundWindow Failed");
+            return;
+        }
 
         if (CheckProcessAppArray())
         {
@@ -676,16 +719,10 @@ class ResidentTest : Form
         {
             RanEnteredBackgroundApp();
         }
-        if (GetWindowText(foregroundWindowHandle, buff, nChars) > 0)
+        if (string.IsNullOrEmpty(foregroundWindowTitle))
         {
-#if DEBUG
-            Console.WriteLine($"タイトル:{buff} プロセス名:{foregroundprocessName}");
-#endif
-            foregroundWindowTitle = buff.ToString();
-        }
-        else
-        {
-            Console.WriteLine($"タイトルを取得できません。タイトル:{buff} プロセス名:{foregroundprocessName}");
+            /* 先に出力してある */
+            // Console.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
             return;
         }
         if (foregroundWindowTitle != previousWindowTitle)
