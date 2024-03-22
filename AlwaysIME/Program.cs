@@ -403,7 +403,7 @@ class ResidentTest : Form
             icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         }
     }
-    private bool CheckProcessAppArray(int param)
+    private bool CheckforegroundprocessName(int param)
     {
         if (List[param] != null)
         {
@@ -478,7 +478,7 @@ class ResidentTest : Form
 #if DEBUG
                 Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
 #endif
-                if (CheckProcessAppArray(ImeOffArray))
+                if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
                 }
@@ -796,7 +796,7 @@ class ResidentTest : Form
             return;
         }
 
-        if (CheckProcessAppArray(appArray))
+        if (CheckforegroundprocessName(appArray))
         {
 #if DEBUG
             Console.WriteLine($"{foregroundprocessName} はAppListに含まれています");
@@ -836,7 +836,7 @@ class ResidentTest : Form
         {
             if (ImeModeGlobal)
             {
-                if (CheckProcessAppArray(ImeOffArray))
+                if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
                 }
@@ -859,7 +859,7 @@ class ResidentTest : Form
             }
             if (!ImeModeGlobal)
             {
-                if (CheckProcessAppArray(ImeOffArray))
+                if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
                 }
