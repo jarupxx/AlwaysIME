@@ -448,7 +448,7 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessEnteredBackgroundArray(int param)
+    private bool CheckpreviousprocessName(int param)
     {
         if (List[param] != null)
         {
@@ -815,7 +815,7 @@ class ResidentTest : Form
         {
             flagOnActivated = false;
         }
-        if (CheckProcessEnteredBackgroundArray(EnteredBackgroundArray))
+        if (CheckpreviousprocessName(EnteredBackgroundArray))
         {
 #if DEBUG
             Console.WriteLine($"{previousprocessName} はEnteredBackgroundAppListに含まれています");
