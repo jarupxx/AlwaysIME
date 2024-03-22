@@ -417,20 +417,6 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessImeOffArray(int param)
-    {
-        if (List[param] != null)
-        {
-            for (int i = 0; i < List[param].Length; i++)
-            {
-                if (foregroundprocessName.ToLower() == List[param][i].ToLower())
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
     private bool CheckProcessImeOffTitleArray(int param)
     {
         if (List[param] != null)
@@ -506,7 +492,7 @@ class ResidentTest : Form
 #if DEBUG
                 Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
 #endif
-                if (CheckProcessImeOffArray(ImeOffArray))
+                if (CheckProcessAppArray(ImeOffArray))
                 {
                     SetImeOffList();
                 }
@@ -864,7 +850,7 @@ class ResidentTest : Form
         {
             if (ImeModeGlobal)
             {
-                if (CheckProcessImeOffArray(ImeOffArray))
+                if (CheckProcessAppArray(ImeOffArray))
                 {
                     SetImeOffList();
                 }
@@ -887,7 +873,7 @@ class ResidentTest : Form
             }
             if (!ImeModeGlobal)
             {
-                if (CheckProcessImeOffArray(ImeOffArray))
+                if (CheckProcessAppArray(ImeOffArray))
                 {
                     SetImeOffList();
                 }
