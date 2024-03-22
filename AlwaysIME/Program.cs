@@ -55,13 +55,13 @@ class ResidentTest : Form
     static int delayRanEnteredBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
-    private string[][] List = new string[6 + 1][];
-    const int appArray = 1;
-    const int ImeOffArray = 2;
-    const int ImeOffTitleArray = 3;
-    const int SpaceTitleArray = 4;
-    const int OnActivatedAppArray = 5;
-    const int EnteredBackgroundArray = 6;
+    private readonly string[][] List = new string[6][];
+    const int PassArray = 0;
+    const int ImeOffArray = 1;
+    const int ImeOffTitleArray = 2;
+    const int SpaceTitleArray = 3;
+    const int OnActivatedAppArray = 4;
+    const int EnteredBackgroundArray = 5;
     private string RanOnActivatedAppPath;
     private string RanOnActivatedArgv;
     private string RanEnteredBackgroundAppPath;
@@ -164,7 +164,7 @@ class ResidentTest : Form
 
     public void InitializeAppConfig()
     {
-        List[appArray] = null;
+        List[PassArray] = null;
         List[ImeOffArray] = null;
         List[ImeOffTitleArray] = null;
         List[SpaceTitleArray] = null;
@@ -186,10 +186,10 @@ class ResidentTest : Form
         {
             ImeModeGlobal = false;
         }
-        buff = ConfigurationManager.AppSettings["AppList"];
+        buff = ConfigurationManager.AppSettings["PassList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[appArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[PassArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["ImeOffList"];
         if (!string.IsNullOrEmpty(buff))
@@ -403,71 +403,15 @@ class ResidentTest : Form
             icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         }
     }
-    private bool CheckProcessAppArray()
+    private bool CheckforegroundprocessName(int param)
     {
-        if (List[appArray] != null)
-        {
-            for (int i = 0; i < List[appArray].Length; i++)
-            {
-                if (foregroundprocessName.ToLower() == List[appArray][i].ToLower())
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-    private bool CheckProcessImeOffArray()
-    {
-        if (List[ImeOffArray] != null)
-        {
-            for (int i = 0; i < List[ImeOffArray].Length; i++)
-            {
-                if (foregroundprocessName.ToLower() == List[ImeOffArray][i].ToLower())
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-    private bool CheckProcessImeOffTitleArray()
-    {
-        if (List[ImeOffTitleArray] != null)
-        {
-            for (int i = 0; i < List[ImeOffTitleArray].Length; i++)
-            {
-                if (Regex.IsMatch(foregroundWindowTitle, List[ImeOffTitleArray][i]))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-    private bool CheckProcessSpaceTitleArray()
-    {
-        if (List[SpaceTitleArray] != null)
-        {
-            for (int i = 0; i < List[SpaceTitleArray].Length; i++)
-            {
-                if (Regex.IsMatch(foregroundWindowTitle, List[SpaceTitleArray][i]))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-    private bool CheckProcessOnActivatedAppArray()
-    {
-        if (List[OnActivatedAppArray] != null)
+        if (List[param] != null)
         {
             if (!string.IsNullOrEmpty(foregroundprocessName))
             {
-                for (int i = 0; i < List[OnActivatedAppArray].Length; i++)
+                for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (foregroundprocessName.ToLower() == List[OnActivatedAppArray][i].ToLower())
+                    if (foregroundprocessName.ToLower() == List[param][i].ToLower())
                     {
                         return true;
                     }
@@ -476,15 +420,29 @@ class ResidentTest : Form
         }
         return false;
     }
-    private bool CheckProcessEnteredBackgroundArray()
+    private bool CheckforegroundWindowTitleRegex(int param)
     {
-        if (List[EnteredBackgroundArray] != null)
+        if (List[param] != null)
+        {
+            for (int i = 0; i < List[param].Length; i++)
+            {
+                if (Regex.IsMatch(foregroundWindowTitle, List[param][i]))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    private bool CheckpreviousprocessName(int param)
+    {
+        if (List[param] != null)
         {
             if (!string.IsNullOrEmpty(previousprocessName))
             {
-                for (int i = 0; i < List[EnteredBackgroundArray].Length; i++)
+                for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (previousprocessName.ToLower() == List[EnteredBackgroundArray][i].ToLower())
+                    if (previousprocessName.ToLower() == List[param][i].ToLower())
                     {
                         return true;
                     }
@@ -506,7 +464,7 @@ class ResidentTest : Form
 #if DEBUG
                 Console.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
 #endif
-                if (CheckProcessImeOffArray())
+                if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
                 }
@@ -646,9 +604,9 @@ class ResidentTest : Form
             changeIme = false;
         }
     }
-    private void MonitorOnActivated()
+    private void MonitorOnActivated(int param)
     {
-        if (List[OnActivatedAppArray] != null)
+        if (List[param] != null)
         {
             if (!string.IsNullOrEmpty(foregroundprocessName))
             {
@@ -663,11 +621,11 @@ class ResidentTest : Form
             }
         }
     }
-    private void MonitorEnteredBackground()
+    private void MonitorEnteredBackground(int param)
     {
         Console.WriteLine($"{previousprocessName},{foregroundprocessName}");
         // 非アクティブになってから{DelayBackgroundCount}回ループで解除する
-        if (List[EnteredBackgroundArray] != null)
+        if (List[param] != null)
         {
             delayRanEnteredBackgroundApp = DelayBackgroundInterval;
             flagIconColor = true;
@@ -824,7 +782,7 @@ class ResidentTest : Form
             return;
         }
 
-        if (CheckProcessAppArray())
+        if (CheckforegroundprocessName(PassArray))
         {
 #if DEBUG
             Console.WriteLine($"{foregroundprocessName} はAppListに含まれています");
@@ -832,23 +790,23 @@ class ResidentTest : Form
             icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
             return;
         }
-        if (CheckProcessOnActivatedAppArray())
+        if (CheckforegroundprocessName(OnActivatedAppArray))
         {
 #if DEBUG
             Console.WriteLine($"{foregroundprocessName} はOnActivatedAppListに含まれています");
 #endif
-            MonitorOnActivated();
+            MonitorOnActivated(OnActivatedAppArray);
         }
         else
         {
             flagOnActivated = false;
         }
-        if (CheckProcessEnteredBackgroundArray())
+        if (CheckpreviousprocessName(EnteredBackgroundArray))
         {
 #if DEBUG
             Console.WriteLine($"{previousprocessName} はEnteredBackgroundAppListに含まれています");
 #endif
-            MonitorEnteredBackground();
+            MonitorEnteredBackground(EnteredBackgroundArray);
         }
         else
         {
@@ -864,18 +822,18 @@ class ResidentTest : Form
         {
             if (ImeModeGlobal)
             {
-                if (CheckProcessImeOffArray())
+                if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
                 }
-                else if (CheckProcessImeOffTitleArray())
+                else if (CheckforegroundWindowTitleRegex(ImeOffTitleArray))
                 {
                     SetImeOffList();
                 }
                 else
                 {
                     SetImeGlobal();
-                    if (CheckProcessSpaceTitleArray())
+                    if (CheckforegroundWindowTitleRegex(SpaceTitleArray))
                     {
                         SetInputSpaceList();
                     }
@@ -887,18 +845,18 @@ class ResidentTest : Form
             }
             if (!ImeModeGlobal)
             {
-                if (CheckProcessImeOffArray())
+                if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
                 }
-                else if (CheckProcessImeOffTitleArray())
+                else if (CheckforegroundWindowTitleRegex(ImeOffTitleArray))
                 {
                     SetImeOffList();
                 }
                 else
                 {
                     SetImePreset();
-                    if (CheckProcessSpaceTitleArray())
+                    if (CheckforegroundWindowTitleRegex(SpaceTitleArray))
                     {
                         SetInputSpaceList();
                     }
