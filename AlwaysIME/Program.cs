@@ -55,12 +55,13 @@ class ResidentTest : Form
     static int delayRanEnteredBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
-    private string[] appArray;
-    private string[] ImeOffArray;
-    private string[] ImeOffTitleArray;
-    private string[] ZenkakuSpaceTitleArray;
-    private string[] OnActivatedAppArray;
-    private string[] EnteredBackgroundArray;
+    private string[][] List = new string[6 + 1][];
+    const int appArray = 1;
+    const int ImeOffArray = 2;
+    const int ImeOffTitleArray = 3;
+    const int ZenkakuSpaceTitleArray = 4;
+    const int OnActivatedAppArray = 5;
+    const int EnteredBackgroundArray = 6;
     private string RanOnActivatedAppPath;
     private string RanOnActivatedArgv;
     private string RanEnteredBackgroundAppPath;
@@ -162,6 +163,12 @@ class ResidentTest : Form
 
     public void InitializeAppConfig()
     {
+        List[appArray] = null;
+        List[ImeOffArray] = null;
+        List[ImeOffTitleArray] = null;
+        List[ZenkakuSpaceTitleArray] = null;
+        List[OnActivatedAppArray] = null;
+        List[EnteredBackgroundArray] = null;
         string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
         if (!string.IsNullOrEmpty(buff))
         {
@@ -181,22 +188,22 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["AppList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            appArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[appArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["ImeOffList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            ImeOffArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[ImeOffArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["ImeOffTitle"];
         if (!string.IsNullOrEmpty(buff))
         {
-            ImeOffTitleArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[ImeOffTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["ZenkakuSpaceTitle"];
         if (!string.IsNullOrEmpty(buff))
         {
-            ZenkakuSpaceTitleArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[ZenkakuSpaceTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
             DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
         }
         buff = ConfigurationManager.AppSettings["intervalTime"];
@@ -227,7 +234,7 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["OnActivatedAppList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            OnActivatedAppArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[OnActivatedAppArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = (ConfigurationManager.AppSettings["OnActivatedAppPath"]);
         if (!string.IsNullOrEmpty(buff))
@@ -243,7 +250,7 @@ class ResidentTest : Form
         }
         /* else
         {
-            OnActivatedAppArray = null;
+            List[OnActivatedAppArray] = null;
         } */
         buff = ConfigurationManager.AppSettings["OnActivatedArgv"];
         if (!string.IsNullOrEmpty(buff))
@@ -253,7 +260,7 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["EnteredBackgroundAppList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            EnteredBackgroundArray = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[EnteredBackgroundArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = (ConfigurationManager.AppSettings["EnteredBackgroundAppPath"]);
         if (!string.IsNullOrEmpty(buff))
@@ -270,7 +277,7 @@ class ResidentTest : Form
         }
         /* else
         {
-            EnteredBackgroundArray = null;
+            List[EnteredBackgroundArray] = null;
         } */
         buff = ConfigurationManager.AppSettings["EnteredBackgroundArgv"];
         if (!string.IsNullOrEmpty(buff))
@@ -388,11 +395,11 @@ class ResidentTest : Form
     }
     private bool CheckProcessAppArray()
     {
-        if (appArray != null)
+        if (List[appArray] != null)
         {
-            for (int i = 0; i < appArray.Length; i++)
+            for (int i = 0; i < List[appArray].Length; i++)
             {
-                if (foregroundprocessName.ToLower() == appArray[i].ToLower())
+                if (foregroundprocessName.ToLower() == List[appArray][i].ToLower())
                 {
                     return true;
                 }
@@ -402,11 +409,11 @@ class ResidentTest : Form
     }
     private bool CheckProcessImeOffArray()
     {
-        if (ImeOffArray != null)
+        if (List[ImeOffArray] != null)
         {
-            for (int i = 0; i < ImeOffArray.Length; i++)
+            for (int i = 0; i < List[ImeOffArray].Length; i++)
             {
-                if (foregroundprocessName.ToLower() == ImeOffArray[i].ToLower())
+                if (foregroundprocessName.ToLower() == List[ImeOffArray][i].ToLower())
                 {
                     return true;
                 }
@@ -416,11 +423,11 @@ class ResidentTest : Form
     }
     private bool CheckProcessImeOffTitleArray()
     {
-        if (ImeOffTitleArray != null)
+        if (List[ImeOffTitleArray] != null)
         {
-            for (int i = 0; i < ImeOffTitleArray.Length; i++)
+            for (int i = 0; i < List[ImeOffTitleArray].Length; i++)
             {
-                if (Regex.IsMatch(foregroundWindowTitle, ImeOffTitleArray[i]))
+                if (Regex.IsMatch(foregroundWindowTitle, List[ImeOffTitleArray][i]))
                 {
                     return true;
                 }
@@ -430,11 +437,11 @@ class ResidentTest : Form
     }
     private bool CheckProcessZenkakuSpaceTitleArray()
     {
-        if (ZenkakuSpaceTitleArray != null)
+        if (List[ZenkakuSpaceTitleArray] != null)
         {
-            for (int i = 0; i < ZenkakuSpaceTitleArray.Length; i++)
+            for (int i = 0; i < List[ZenkakuSpaceTitleArray].Length; i++)
             {
-                if (Regex.IsMatch(foregroundWindowTitle, ZenkakuSpaceTitleArray[i]))
+                if (Regex.IsMatch(foregroundWindowTitle, List[ZenkakuSpaceTitleArray][i]))
                 {
                     return true;
                 }
@@ -444,13 +451,13 @@ class ResidentTest : Form
     }
     private bool CheckProcessOnActivatedAppArray()
     {
-        if (OnActivatedAppArray != null)
+        if (List[OnActivatedAppArray] != null)
         {
             if (!string.IsNullOrEmpty(foregroundprocessName))
             {
-                for (int i = 0; i < OnActivatedAppArray.Length; i++)
+                for (int i = 0; i < List[OnActivatedAppArray].Length; i++)
                 {
-                    if (foregroundprocessName.ToLower() == OnActivatedAppArray[i].ToLower())
+                    if (foregroundprocessName.ToLower() == List[OnActivatedAppArray][i].ToLower())
                     {
                         return true;
                     }
@@ -461,13 +468,13 @@ class ResidentTest : Form
     }
     private bool CheckProcessEnteredBackgroundArray()
     {
-        if (EnteredBackgroundArray != null)
+        if (List[EnteredBackgroundArray] != null)
         {
             if (!string.IsNullOrEmpty(previousprocessName))
             {
-                for (int i = 0; i < EnteredBackgroundArray.Length; i++)
+                for (int i = 0; i < List[EnteredBackgroundArray].Length; i++)
                 {
-                    if (previousprocessName.ToLower() == EnteredBackgroundArray[i].ToLower())
+                    if (previousprocessName.ToLower() == List[EnteredBackgroundArray][i].ToLower())
                     {
                         return true;
                     }
@@ -617,7 +624,7 @@ class ResidentTest : Form
     }
     private void MonitorOnActivated()
     {
-        if (OnActivatedAppArray != null)
+        if (List[OnActivatedAppArray] != null)
         {
             if (!string.IsNullOrEmpty(foregroundprocessName))
             {
@@ -636,7 +643,7 @@ class ResidentTest : Form
     {
         Console.WriteLine($"{previousprocessName},{foregroundprocessName}");
         // 非アクティブになってから{DelayBackgroundCount}回ループで解除する
-        if (EnteredBackgroundArray != null)
+        if (List[EnteredBackgroundArray] != null)
         {
             delayRanEnteredBackgroundApp = DelayBackgroundInterval;
             flagIconColor = true;
