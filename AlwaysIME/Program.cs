@@ -54,12 +54,12 @@ class ResidentTest : Form
     static int delayRanEnteredBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
-    private readonly string[][] List = new string[6][];
+    private readonly string[][] List = new string[5][];
     const int PassArray = 0;
     const int ImeOffArray = 1;
     const int ImeOffTitleArray = 2;
-    const int OnActivatedAppArray = 4;
-    const int EnteredBackgroundArray = 5;
+    const int OnActivatedAppArray = 3;
+    const int EnteredBackgroundArray = 4;
     private string RanOnActivatedAppPath;
     private string RanOnActivatedArgv;
     private string RanEnteredBackgroundAppPath;
