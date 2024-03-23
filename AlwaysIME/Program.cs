@@ -44,7 +44,6 @@ class ResidentTest : Form
     private int iconsize;
     static string previousWindowTitle;
     static string previousprocessName;
-    static int previousSpaceWidth;
     static bool ImeModeGlobal = true;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
@@ -55,19 +54,17 @@ class ResidentTest : Form
     static int delayRanEnteredBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
-    private readonly string[][] List = new string[6][];
+    private readonly string[][] List = new string[5][];
     const int PassArray = 0;
     const int ImeOffArray = 1;
     const int ImeOffTitleArray = 2;
-    const int SpaceTitleArray = 3;
-    const int OnActivatedAppArray = 4;
-    const int EnteredBackgroundArray = 5;
+    const int OnActivatedAppArray = 3;
+    const int EnteredBackgroundArray = 4;
     private string RanOnActivatedAppPath;
     private string RanOnActivatedArgv;
     private string RanEnteredBackgroundAppPath;
     private string FWEnteredBackgroundArgv;
     private int imeInterval = 500;
-    private int SetSpaceMode = 0;
     private int SuspendFewInterval = 5;
     private int SuspendInterval = 45;
     private int DelayBackgroundInterval = 2147483647;
@@ -76,7 +73,6 @@ class ResidentTest : Form
     IntPtr imwd;
     int imeConvMode = 0;
     bool imeEnabled = false;
-    int DefaultSpaceWidth;
 
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
@@ -141,16 +137,6 @@ class ResidentTest : Form
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
     // 27 :   全角カナ                     0001 1011
 
-    const string keyPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
-    const string valueName = "InputSpace";
-    const RegistryValueKind valueType = RegistryValueKind.DWord;
-    const int IME_AUTO_WIDTH_SPACE = 0;
-    const int IME_FULL_WIDTH_SPACE = 1;
-    const int IME_HALF_WIDTH_SPACE = 2;
-    // 0: 現在の入力モード
-    // 1: 常に全角
-    // 2: 常に半角
-
     public ResidentTest()
     {
         this.ShowInTaskbar = false;
@@ -167,7 +153,6 @@ class ResidentTest : Form
         List[PassArray] = null;
         List[ImeOffArray] = null;
         List[ImeOffTitleArray] = null;
-        List[SpaceTitleArray] = null;
         List[OnActivatedAppArray] = null;
         List[EnteredBackgroundArray] = null;
         string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
@@ -200,21 +185,6 @@ class ResidentTest : Form
         if (!string.IsNullOrEmpty(buff))
         {
             List[ImeOffTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-        }
-        buff = ConfigurationManager.AppSettings["SpaceMode"];
-        DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
-        if (!string.IsNullOrEmpty(buff))
-        {
-            SetSpaceMode = int.Parse(buff);
-            buff = ConfigurationManager.AppSettings["SpaceTitle"];
-            if (!string.IsNullOrEmpty(buff))
-            {
-                List[SpaceTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-            }
-        }
-        else
-        {
-            SetSpaceMode = DefaultSpaceWidth;
         }
         buff = ConfigurationManager.AppSettings["intervalTime"];
         if (!string.IsNullOrEmpty(buff))
@@ -298,7 +268,6 @@ class ResidentTest : Form
 
     private void Close_Click(object sender, EventArgs e)
     {
-        SetDefaultSpace();
         icon.Visible = false;
         icon.Dispose();
         System.Windows.Forms.Application.Exit();
@@ -518,56 +487,6 @@ class ResidentTest : Form
             }
         }
     }
-    private void SetInputSpaceList()
-    {
-        int newValue = SetSpaceMode;
-        if (newValue != previousSpaceWidth)
-        {
-            if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
-            {
-#if DEBUG
-                switch (SetSpaceMode)
-                {
-                    case 0:
-                        Console.WriteLine($"スペースを現在の入力モードにしました");
-                        break;
-                    case 1:
-                        Console.WriteLine($"スペースを常に全角にしました");
-                        break;
-                    case 2:
-                        Console.WriteLine($"スペースを常に半角にしました");
-                        break;
-                    default:
-                        /* Nothing to do */
-                        break;
-                }
-#endif
-                previousSpaceWidth = newValue;
-            }
-            else
-            {
-                Console.WriteLine("Failed to write registory.");
-            }
-        }
-    }
-    private void SetDefaultSpace()
-    {
-        int newValue = DefaultSpaceWidth;
-        if (newValue != previousSpaceWidth)
-        {
-            if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
-            {
-#if DEBUG
-                Console.WriteLine($"スペースをデフォルトに戻しました");
-#endif
-                previousSpaceWidth = newValue;
-            }
-            else
-            {
-                Console.WriteLine("Failed to write registory.");
-            }
-        }
-    }
     private void SetImeOffList()
     {
         // previousWindowTitle：更新 previousimeEnabled：そのまま
@@ -655,40 +574,7 @@ class ResidentTest : Form
             }
         }
     }
-    static object ReadRegistryValue(RegistryHive hive, string keyPath, string valueName, RegistryValueKind valueType)
-    {
-        using (var regKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default).OpenSubKey(keyPath))
-        {
-            if (regKey != null)
-            {
-                object value = regKey.GetValue(valueName, null);
-                if (value != null && regKey.GetValueKind(valueName) == valueType)
-                {
-                    return value;
-                }
-            }
-        }
-        return null;
-    }
-    static bool WriteRegistryValue(RegistryHive hive, string keyPath, string valueName, object value, RegistryValueKind valueType)
-    {
-        try
-        {
-            using (var regKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default).CreateSubKey(keyPath))
-            {
-                if (regKey != null)
-                {
-                    regKey.SetValue(valueName, value, valueType);
-                    return true;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error writing registry value: {ex.Message}");
-        }
-        return false;
-    }
+
     // 半角カナ/全角英数/カタカナ モードを強制的に「ひらがな」モードに変更する
     void MonitorActiveWindow()
     {
@@ -833,14 +719,6 @@ class ResidentTest : Form
                 else
                 {
                     SetImeGlobal();
-                    if (CheckforegroundWindowTitleRegex(SpaceTitleArray))
-                    {
-                        SetInputSpaceList();
-                    }
-                    else
-                    {
-                        SetDefaultSpace();
-                    }
                 }
             }
             if (!ImeModeGlobal)
@@ -856,14 +734,6 @@ class ResidentTest : Form
                 else
                 {
                     SetImePreset();
-                    if (CheckforegroundWindowTitleRegex(SpaceTitleArray))
-                    {
-                        SetInputSpaceList();
-                    }
-                    else
-                    {
-                        SetDefaultSpace();
-                    }
                 }
             }
             SetIcon();
