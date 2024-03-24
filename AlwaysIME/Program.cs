@@ -664,7 +664,7 @@ class ResidentTest : Form
 
         if (CheckforegroundprocessName(PassArray))
         {
-            Debug.WriteLine($"{foregroundprocessName} はAppListに含まれています");
+            Debug.WriteLine($"{foregroundprocessName} はPassListに含まれています");
             SetIcon(ICON_GRAY);
             return;
         }
