@@ -298,8 +298,20 @@ class ResidentTest : Form
         resumeMenuItem.Click += new EventHandler(ResumeMenuItem_Click);
         menu.Items.Add(resumeMenuItem);
 
-        ToolStripSeparator separator = new ToolStripSeparator();
-        menu.Items.Add(separator);
+        ToolStripSeparator separator1 = new ToolStripSeparator();
+        menu.Items.Add(separator1);
+
+        ToolStripMenuItem updateModeMenuItem = new ToolStripMenuItem("IME Mode");
+        ToolStripMenuItem menuItemModeOn = new ToolStripMenuItem("IMEオン");
+        menuItemModeOn.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave("on"));
+        ToolStripMenuItem menuItemModeOff = new ToolStripMenuItem("グローバル");
+        menuItemModeOff.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave("off"));
+        updateModeMenuItem.DropDownItems.Add(menuItemModeOn);
+        updateModeMenuItem.DropDownItems.Add(menuItemModeOff);
+        menu.Items.Add(updateModeMenuItem);
+
+        ToolStripSeparator separator2 = new ToolStripSeparator();
+        menu.Items.Add(separator2);
 
         ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新時間");
         ToolStripMenuItem menuItem250 = new ToolStripMenuItem("250 ms");
@@ -313,8 +325,8 @@ class ResidentTest : Form
         updateTimeMenuItem.DropDownItems.Add(menuItem1000);
         menu.Items.Add(updateTimeMenuItem);
 
-        ToolStripSeparator separator2 = new ToolStripSeparator();
-        menu.Items.Add(separator2);
+        ToolStripSeparator separator3 = new ToolStripSeparator();
+        menu.Items.Add(separator3);
 
         ToolStripMenuItem menuItem = new ToolStripMenuItem();
         menuItem.Text = "常駐の終了(&X)";
@@ -348,6 +360,23 @@ class ResidentTest : Form
 
         SetIcon(ICON_GREEN);
         Trace.WriteLine("再開しました");
+    }
+    private void ChangeAlwaysIMEModeAndSave(String mode)
+    {
+        // App.config の更新
+        Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+        config.AppSettings.Settings["AlwaysIMEMode"].Value = mode;
+        config.Save(ConfigurationSaveMode.Modified);
+        ConfigurationManager.RefreshSection("appSettings");
+
+            if (mode.CompareTo("off") == 0)
+            {
+                ImeModeGlobal = true;
+            }
+            else
+            {
+                ImeModeGlobal = false;
+            }
     }
     private void ChangeIntervalAndSave(int interval)
     {
