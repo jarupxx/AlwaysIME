@@ -1,6 +1,4 @@
-﻿using System.Windows.Forms;
-
-namespace AlwaysIME
+﻿namespace AlwaysIME
 {
     public partial class Form1 : Form
     {
