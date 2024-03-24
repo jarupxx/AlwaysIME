@@ -278,7 +278,7 @@ class ResidentTest : Form
     private void setComponents()
     {
         using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
-            iconsize = (int)(SystemParameters.SmallIconWidth * graphics.DpiX / 96);
+            iconsize = (int)(16 * graphics.DpiX / 96);
         icon = new NotifyIcon();
         icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         icon.Visible = true;
