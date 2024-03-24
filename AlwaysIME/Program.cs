@@ -42,13 +42,16 @@ class ResidentTest : Form
     private System.Windows.Forms.Timer timer;
     private NotifyIcon icon;
     private int iconsize;
+    const int ICON_RED = 0;
+    const int ICON_GREEN = 1;
+    const int ICON_GRAY = 2;
+    static int previousIconColor = ICON_GREEN;
     static string previousWindowTitle;
     static string previousprocessName;
     static bool ImeModeGlobal = true;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
-    static bool flagIconColor = false;
     static bool flagOnActivated = false;
     static bool ScheduleRanEnteredBackgroundApp = false;
     static int delayRanEnteredBackgroundApp = 2147483647;
@@ -322,7 +325,7 @@ class ResidentTest : Form
     private void ResumeMenuItem_Click(object sender, EventArgs e)
     {
         this.timer.Start();
-        icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+        SetIcon(ICON_GREEN);
         Trace.WriteLine("クリックにより再開しました");
     }
     private async void SuspendFewMenuItem_Click(object sender, EventArgs e)
@@ -336,14 +339,14 @@ class ResidentTest : Form
 
     private async Task SuspendAsync(TimeSpan duration)
     {
-        icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
+        SetIcon(ICON_GRAY);
         Trace.WriteLine($"{duration.TotalMinutes}分間無効にします({DateTime.Now + duration}まで)");
 
         this.timer.Stop();
         await Task.Delay(duration);
         this.timer.Start();
 
-        icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+        SetIcon(ICON_GREEN);
         Trace.WriteLine("再開しました");
     }
     private void ChangeIntervalAndSave(int interval)
@@ -361,16 +364,26 @@ class ResidentTest : Form
     {
         MonitorActiveWindow();
     }
-    private void SetIcon()
+    private void SetIcon(int param)
     {
-        if (flagIconColor)
+        if (ScheduleRanEnteredBackgroundApp && param == ICON_GREEN)
+            param = ICON_RED;
+        if (previousIconColor != param)
         {
-            icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
+            switch (param)
+            {
+                case ICON_RED:
+                    icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
+                    break;
+                case ICON_GRAY:
+                    icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
+                    break;
+                default: /* ICON_GREEN */
+                    icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+                    break;
+            }
         }
-        else
-        {
-            icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
-        }
+        previousIconColor = param;
     }
     private bool CheckforegroundprocessName(int param)
     {
@@ -524,8 +537,7 @@ class ResidentTest : Form
                     Trace.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
                     Process.Start(RanOnActivatedAppPath, RanOnActivatedArgv);
                     flagOnActivated = true;
-                    flagIconColor = true;
-                    icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
+                    SetIcon(ICON_RED);
                 }
             }
         }
@@ -537,7 +549,7 @@ class ResidentTest : Form
         if (List[param] != null)
         {
             delayRanEnteredBackgroundApp = DelayBackgroundInterval;
-            flagIconColor = true;
+            SetIcon(ICON_RED);
             ScheduleRanEnteredBackgroundApp = true;
             Debug.WriteLine("Set ScheduleRanEnteredBackgroundApp = true;");
         }
@@ -553,9 +565,8 @@ class ResidentTest : Form
             {
                 // 非アクティブならFirewallを解除する
                 Process.Start(RanEnteredBackgroundAppPath, FWEnteredBackgroundArgv);
-                flagIconColor = false;
                 ScheduleRanEnteredBackgroundApp = false;
-                icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+                SetIcon(ICON_GREEN);
                 Debug.WriteLine("時間経過により連携アプリが起動します");
             }
         }
@@ -653,7 +664,7 @@ class ResidentTest : Form
         if (CheckforegroundprocessName(PassArray))
         {
             Debug.WriteLine($"{foregroundprocessName} はAppListに含まれています");
-            icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
+            SetIcon(ICON_GRAY);
             return;
         }
         if (CheckforegroundprocessName(OnActivatedAppArray))
@@ -712,7 +723,7 @@ class ResidentTest : Form
                     SetImePreset();
                 }
             }
-            SetIcon();
+            SetIcon(ICON_GREEN);
         }
         if (imeEnabled)
         {
