@@ -209,10 +209,10 @@ class ResidentTest : Form
         {
             noKeyInputInterval = (int)(float.Parse(buff) * 60 * 1000);
         }
-        buff = ConfigurationManager.AppSettings["DelayBackgroundCount"];
+        buff = ConfigurationManager.AppSettings["DelayBackgroundTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            DelayBackgroundInterval = int.Parse(buff);
+            DelayBackgroundInterval = (int)(float.Parse(buff) * 60 * 1000 / imeInterval);
         }
         buff = ConfigurationManager.AppSettings["OnActivatedAppList"];
         if (!string.IsNullOrEmpty(buff))
@@ -545,7 +545,7 @@ class ResidentTest : Form
     private void MonitorBackground(int param)
     {
         Trace.WriteLine($"{previousprocessName},{foregroundprocessName}");
-        // 非アクティブになってから{DelayBackgroundCount}回ループで解除する
+        // 非アクティブになってから指定回数ループで解除する
         if (List[param] != null)
         {
             delayRunBackgroundApp = DelayBackgroundInterval;
