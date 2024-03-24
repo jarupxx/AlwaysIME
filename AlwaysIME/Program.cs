@@ -323,7 +323,7 @@ class ResidentTest : Form
     {
         this.timer.Start();
         icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
-        Debug.WriteLine("クリックにより再開しました");
+        Trace.WriteLine("クリックにより再開しました");
     }
     private async void SuspendFewMenuItem_Click(object sender, EventArgs e)
     {
@@ -337,14 +337,14 @@ class ResidentTest : Form
     private async Task SuspendAsync(TimeSpan duration)
     {
         icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
-        Debug.WriteLine($"{duration.TotalMinutes}分間無効にします({DateTime.Now + duration}まで)");
+        Trace.WriteLine($"{duration.TotalMinutes}分間無効にします({DateTime.Now + duration}まで)");
 
         this.timer.Stop();
         await Task.Delay(duration);
         this.timer.Start();
 
         icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
-        Debug.WriteLine("再開しました");
+        Trace.WriteLine("再開しました");
     }
     private void ChangeIntervalAndSave(int interval)
     {
@@ -430,9 +430,7 @@ class ResidentTest : Form
         {
             if (!noKeyInput)
             {
-#if DEBUG
                 Debug.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
-#endif
                 if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
@@ -458,14 +456,12 @@ class ResidentTest : Form
             imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
             if (imeEnabled)
             {
-#if DEBUG
                 Debug.WriteLine("IMEを有効にしました");
-#endif
                 changeIme = true;
             }
             else
             {
-                Debug.WriteLine("IMEが有効になりません");
+                Trace.WriteLine("IMEが有効になりません");
                 changeIme = false;
             }
         }
@@ -475,14 +471,12 @@ class ResidentTest : Form
             imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
             if (!imeEnabled)
             {
-#if DEBUG
                 Debug.WriteLine("IMEを無効にしました");
-#endif
                 changeIme = true;
             }
             else
             {
-                Debug.WriteLine("IMEが無効になりません");
+                Trace.WriteLine("IMEが無効になりません");
                 changeIme = false;
             }
         }
@@ -494,15 +488,13 @@ class ResidentTest : Form
         imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
         if (!imeEnabled)
         {
-#if DEBUG
             Debug.WriteLine("SetImeOffList：IMEを無効にしました");
-#endif
             changeIme = false;
             previousWindowTitle = foregroundWindowTitle;
         }
         else
         {
-            Debug.WriteLine("SetImeOffList：IMEが無効になりません");
+            Trace.WriteLine("SetImeOffList：IMEが無効になりません");
             changeIme = false;
         }
     }
@@ -512,14 +504,12 @@ class ResidentTest : Form
         imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
         if (imeEnabled)
         {
-#if DEBUG
             Debug.WriteLine("IMEを有効にしました");
-#endif
             changeIme = true;
         }
         else
         {
-            Debug.WriteLine("IMEが有効になりません");
+            Trace.WriteLine("IMEが有効になりません");
             changeIme = false;
         }
     }
@@ -531,7 +521,7 @@ class ResidentTest : Form
             {
                 if (!flagOnActivated)
                 {
-                    Debug.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
+                    Trace.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
                     Process.Start(RanOnActivatedAppPath, RanOnActivatedArgv);
                     flagOnActivated = true;
                     flagIconColor = true;
@@ -542,16 +532,14 @@ class ResidentTest : Form
     }
     private void MonitorEnteredBackground(int param)
     {
-        Debug.WriteLine($"{previousprocessName},{foregroundprocessName}");
+        Trace.WriteLine($"{previousprocessName},{foregroundprocessName}");
         // 非アクティブになってから{DelayBackgroundCount}回ループで解除する
         if (List[param] != null)
         {
             delayRanEnteredBackgroundApp = DelayBackgroundInterval;
             flagIconColor = true;
             ScheduleRanEnteredBackgroundApp = true;
-#if DEBUG
             Debug.WriteLine("Set ScheduleRanEnteredBackgroundApp = true;");
-#endif
         }
     }
     private void RanEnteredBackgroundApp()
@@ -568,9 +556,7 @@ class ResidentTest : Form
                 flagIconColor = false;
                 ScheduleRanEnteredBackgroundApp = false;
                 icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
-#if DEBUG
                 Debug.WriteLine("時間経過により連携アプリが起動します");
-#endif
             }
         }
     }
@@ -584,7 +570,7 @@ class ResidentTest : Form
 
         if (!GetGUIThreadInfo(0, ref gti))
         {
-            Debug.WriteLine("GetGUIThreadInfo failed");
+            Trace.WriteLine("GetGUIThreadInfo failed");
             // スタートアップやロック解除時に例外0x80004005が発生する
             //throw new System.ComponentModel.Win32Exception();
             return;
@@ -596,12 +582,10 @@ class ResidentTest : Form
         imeConvMode = SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETCONVERSIONMODE, IntPtr.Zero);
         imeEnabled = (SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_GETOPENSTATUS, IntPtr.Zero) != 0);
 
-#if DEBUG
         Debug.WriteLine($"{imeEnabled} status code:{imeConvMode}");
-#endif
         if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
         {
-            Debug.WriteLine("IMEが無効です");
+            Trace.WriteLine("IMEが無効です");
             changeIme = false;
             return;
         }
@@ -632,55 +616,49 @@ class ResidentTest : Form
                         if (GetWindowText(foregroundWindowHandle, titleBuilder, titleBuilder.Capacity) > 0)
                         {
                             foregroundWindowTitle = titleBuilder.ToString();
-#if DEBUG
                             Debug.WriteLine($"タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
-#endif
                         }
                         else
                         {
                             foregroundWindowTitle = "";
-                            Debug.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+                            Trace.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
                             /* タイトルが空欄のプロセスが存在するので後でreturn;をする */
                             // return;
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine("GetProcessById Failed: " + ex.Message);
+                        Trace.WriteLine("GetProcessById Failed: " + ex.Message);
                         return;
                     }
                 }
                 else
                 {
-                    Debug.WriteLine("GetWindowThreadProcessId Failed");
+                    Trace.WriteLine("GetWindowThreadProcessId Failed");
                     return;
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("Getting window information Failed: " + ex.Message);
+                Trace.WriteLine("Getting window information Failed: " + ex.Message);
                 return;
             }
         }
         else
         {
-            Debug.WriteLine("GetForegroundWindow Failed");
+            Trace.WriteLine("GetForegroundWindow Failed");
             return;
         }
 
         if (CheckforegroundprocessName(PassArray))
         {
-#if DEBUG
             Debug.WriteLine($"{foregroundprocessName} はAppListに含まれています");
-#endif
             icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
             return;
         }
         if (CheckforegroundprocessName(OnActivatedAppArray))
         {
-#if DEBUG
             Debug.WriteLine($"{foregroundprocessName} はOnActivatedAppListに含まれています");
-#endif
             MonitorOnActivated(OnActivatedAppArray);
         }
         else
@@ -689,9 +667,7 @@ class ResidentTest : Form
         }
         if (CheckpreviousprocessName(EnteredBackgroundArray))
         {
-#if DEBUG
             Debug.WriteLine($"{previousprocessName} はEnteredBackgroundAppListに含まれています");
-#endif
             MonitorEnteredBackground(EnteredBackgroundArray);
         }
         else
@@ -701,7 +677,7 @@ class ResidentTest : Form
         if (string.IsNullOrEmpty(foregroundWindowTitle))
         {
             /* 先に出力してある */
-            // Debug.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+            // Trace.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
             return;
         }
         if (foregroundWindowTitle != previousWindowTitle)
