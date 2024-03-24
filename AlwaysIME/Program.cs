@@ -387,7 +387,7 @@ class ResidentTest : Form
             {
                 for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (foregroundprocessName.ToLower() == List[param][i].ToLower())
+                    if (foregroundprocessName.Equals(List[param][i], StringComparison.CurrentCultureIgnoreCase))
                     {
                         return true;
                     }
@@ -418,7 +418,7 @@ class ResidentTest : Form
             {
                 for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (previousprocessName.ToLower() == List[param][i].ToLower())
+                    if (previousprocessName.Equals(List[param][i], StringComparison.CurrentCultureIgnoreCase))
                     {
                         return true;
                     }
