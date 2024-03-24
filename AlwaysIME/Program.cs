@@ -53,8 +53,8 @@ class ResidentTest : Form
     static bool changeIme = false;
     static bool noKeyInput = false;
     static bool flagOnActivated = false;
-    static bool ScheduleRanEnteredBackgroundApp = false;
-    static int delayRanEnteredBackgroundApp = 2147483647;
+    static bool ScheduleRunBackgroundApp = false;
+    static int delayRunBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
     private readonly string[][] List = new string[5][];
@@ -62,11 +62,11 @@ class ResidentTest : Form
     const int ImeOffArray = 1;
     const int ImeOffTitleArray = 2;
     const int OnActivatedAppArray = 3;
-    const int EnteredBackgroundArray = 4;
-    private string RanOnActivatedAppPath;
-    private string RanOnActivatedArgv;
-    private string RanEnteredBackgroundAppPath;
-    private string FWEnteredBackgroundArgv;
+    const int BackgroundArray = 4;
+    private string RunOnActivatedAppPath;
+    private string RunOnActivatedArgv;
+    private string RunBackgroundAppPath;
+    private string FWBackgroundArgv;
     private int imeInterval = 500;
     private int SuspendFewInterval = 5;
     private int SuspendInterval = 45;
@@ -157,7 +157,7 @@ class ResidentTest : Form
         List[ImeOffArray] = null;
         List[ImeOffTitleArray] = null;
         List[OnActivatedAppArray] = null;
-        List[EnteredBackgroundArray] = null;
+        List[BackgroundArray] = null;
         string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
         if (!string.IsNullOrEmpty(buff))
         {
@@ -228,7 +228,7 @@ class ResidentTest : Form
             }
             else
             {
-                RanOnActivatedAppPath = buff;
+                RunOnActivatedAppPath = buff;
             }
         }
         /* else
@@ -238,34 +238,34 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["OnActivatedArgv"];
         if (!string.IsNullOrEmpty(buff))
         {
-            RanOnActivatedArgv = buff;
+            RunOnActivatedArgv = buff;
         }
-        buff = ConfigurationManager.AppSettings["EnteredBackgroundAppList"];
+        buff = ConfigurationManager.AppSettings["BackgroundAppList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[EnteredBackgroundArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[BackgroundArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         }
-        buff = (ConfigurationManager.AppSettings["EnteredBackgroundAppPath"]);
+        buff = (ConfigurationManager.AppSettings["BackgroundAppPath"]);
         if (!string.IsNullOrEmpty(buff))
         {
             if (!File.Exists(buff))
             {
-                System.Windows.Forms.MessageBox.Show("EnteredBackgroundAppPath に指定したアプリが見つかりません");
-                ScheduleRanEnteredBackgroundApp = false;
+                System.Windows.Forms.MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
+                ScheduleRunBackgroundApp = false;
             }
             else
             {
-                RanEnteredBackgroundAppPath = buff;
+                RunBackgroundAppPath = buff;
             }
         }
         /* else
         {
-            List[EnteredBackgroundArray] = null;
+            List[BackgroundArray] = null;
         } */
-        buff = ConfigurationManager.AppSettings["EnteredBackgroundArgv"];
+        buff = ConfigurationManager.AppSettings["BackgroundArgv"];
         if (!string.IsNullOrEmpty(buff))
         {
-            FWEnteredBackgroundArgv = buff;
+            FWBackgroundArgv = buff;
         }
     }
 
@@ -366,7 +366,7 @@ class ResidentTest : Form
     }
     private void SetIcon(int param)
     {
-        if (ScheduleRanEnteredBackgroundApp && param == ICON_GREEN)
+        if (ScheduleRunBackgroundApp && param == ICON_GREEN)
             param = ICON_RED;
         if (previousIconColor != param)
         {
@@ -535,37 +535,37 @@ class ResidentTest : Form
                 if (!flagOnActivated)
                 {
                     Trace.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
-                    Process.Start(RanOnActivatedAppPath, RanOnActivatedArgv);
+                    Process.Start(RunOnActivatedAppPath, RunOnActivatedArgv);
                     flagOnActivated = true;
                     SetIcon(ICON_RED);
                 }
             }
         }
     }
-    private void MonitorEnteredBackground(int param)
+    private void MonitorBackground(int param)
     {
         Trace.WriteLine($"{previousprocessName},{foregroundprocessName}");
         // 非アクティブになってから{DelayBackgroundCount}回ループで解除する
         if (List[param] != null)
         {
-            delayRanEnteredBackgroundApp = DelayBackgroundInterval;
+            delayRunBackgroundApp = DelayBackgroundInterval;
             SetIcon(ICON_RED);
-            ScheduleRanEnteredBackgroundApp = true;
-            Debug.WriteLine("Set ScheduleRanEnteredBackgroundApp = true;");
+            ScheduleRunBackgroundApp = true;
+            Debug.WriteLine("Set ScheduleRunBackgroundApp = true;");
         }
     }
-    private void RanEnteredBackgroundApp()
+    private void RunBackgroundApp()
     {
-        delayRanEnteredBackgroundApp--;
-        if (delayRanEnteredBackgroundApp == 0)
+        delayRunBackgroundApp--;
+        if (delayRunBackgroundApp == 0)
         {
             // 何日かすると桁あふれするのでリセットする
-            delayRanEnteredBackgroundApp = 2147483647;
-            if (ScheduleRanEnteredBackgroundApp)
+            delayRunBackgroundApp = 2147483647;
+            if (ScheduleRunBackgroundApp)
             {
                 // 非アクティブならFirewallを解除する
-                Process.Start(RanEnteredBackgroundAppPath, FWEnteredBackgroundArgv);
-                ScheduleRanEnteredBackgroundApp = false;
+                Process.Start(RunBackgroundAppPath, FWBackgroundArgv);
+                ScheduleRunBackgroundApp = false;
                 SetIcon(ICON_GREEN);
                 Debug.WriteLine("時間経過により連携アプリが起動します");
             }
@@ -677,14 +677,14 @@ class ResidentTest : Form
         {
             flagOnActivated = false;
         }
-        if (CheckpreviousprocessName(EnteredBackgroundArray))
+        if (CheckpreviousprocessName(BackgroundArray))
         {
-            Debug.WriteLine($"{previousprocessName} はEnteredBackgroundAppListに含まれています");
-            MonitorEnteredBackground(EnteredBackgroundArray);
+            Debug.WriteLine($"{previousprocessName} はBackgroundAppListに含まれています");
+            MonitorBackground(BackgroundArray);
         }
         else
         {
-            RanEnteredBackgroundApp();
+            RunBackgroundApp();
         }
         if (string.IsNullOrEmpty(foregroundWindowTitle))
         {
