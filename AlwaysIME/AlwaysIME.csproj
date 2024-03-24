@@ -32,6 +32,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Resources\AlwaysIME.dll.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Resources\AlwaysIME.exe.config">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
