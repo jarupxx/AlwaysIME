@@ -2,7 +2,7 @@
 
 ## 詳細設定
 
-AlwaysIME.exe.config を参考に設定してください。
+AlwaysIME.dll.config を参考に設定してください。
 
 - AlwaysIMEMode
 

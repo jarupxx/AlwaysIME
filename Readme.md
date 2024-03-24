@@ -23,3 +23,13 @@ IMEをオフにするタイトル: IMEをオフにするウィンドウのタイ
 ## 詳細設定
 
 ResourcesフォルダーのManual.mdをご覧下さい。
+
+## 動作環境
+
+Windows 10/11
+
+## ランタイム
+
+.NET デスクトップ ランタイム 8.0
+
+https://dotnet.microsoft.com/ja-jp/download

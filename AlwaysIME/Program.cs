@@ -1,16 +1,8 @@
-using Microsoft.Win32;
-using System;
 using System.Configuration;
 using System.Diagnostics;
-using System.Drawing;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Forms;
 
 /*
  参考
@@ -29,6 +21,7 @@ class MainWindow
 
         if (createdNew)
         {
+            ApplicationConfiguration.Initialize();
             ResidentTest rm = new ResidentTest();
             rm.InitializeAppConfig();
             System.Windows.Forms.Application.Run();
@@ -76,6 +69,7 @@ class ResidentTest : Form
     IntPtr imwd;
     int imeConvMode = 0;
     bool imeEnabled = false;
+    internal static readonly char[] separator = [','];
 
     [DllImport("user32.dll")]
     private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
@@ -177,17 +171,17 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["PassList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[PassArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[PassArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["ImeOffList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[ImeOffArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[ImeOffArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["ImeOffTitle"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[ImeOffTitleArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[ImeOffTitleArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["intervalTime"];
         if (!string.IsNullOrEmpty(buff))
@@ -217,7 +211,7 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["OnActivatedAppList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[OnActivatedAppArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[OnActivatedAppArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = (ConfigurationManager.AppSettings["OnActivatedAppPath"]);
         if (!string.IsNullOrEmpty(buff))
@@ -243,7 +237,7 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["BackgroundAppList"];
         if (!string.IsNullOrEmpty(buff))
         {
-            List[BackgroundArray] = buff.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            List[BackgroundArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = (ConfigurationManager.AppSettings["BackgroundAppPath"]);
         if (!string.IsNullOrEmpty(buff))
@@ -278,7 +272,7 @@ class ResidentTest : Form
     private void setComponents()
     {
         using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
-            iconsize = (int)(SystemParameters.SmallIconWidth * graphics.DpiX / 96);
+            iconsize = (int)(16 * graphics.DpiX / 96);
         icon = new NotifyIcon();
         icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         icon.Visible = true;
@@ -422,7 +416,7 @@ class ResidentTest : Form
             {
                 for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (foregroundprocessName.ToLower() == List[param][i].ToLower())
+                    if (foregroundprocessName.Equals(List[param][i], StringComparison.CurrentCultureIgnoreCase))
                     {
                         return true;
                     }
@@ -453,7 +447,7 @@ class ResidentTest : Form
             {
                 for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (previousprocessName.ToLower() == List[param][i].ToLower())
+                    if (previousprocessName.Equals(List[param][i], StringComparison.CurrentCultureIgnoreCase))
                     {
                         return true;
                     }
