@@ -29,6 +29,7 @@ class MainWindow
 
         if (createdNew)
         {
+            ApplicationConfiguration.Initialize();
             ResidentTest rm = new ResidentTest();
             rm.InitializeAppConfig();
             System.Windows.Forms.Application.Run();
