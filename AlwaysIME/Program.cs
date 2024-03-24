@@ -598,6 +598,7 @@ class ResidentTest : Form
         {
             Trace.WriteLine("IMEが無効です");
             changeIme = false;
+            SetIcon(ICON_GREEN);
             return;
         }
 
@@ -689,6 +690,7 @@ class ResidentTest : Form
         {
             /* 先に出力してある */
             // Trace.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+            SetIcon(ICON_GREEN);
             return;
         }
         if (foregroundWindowTitle != previousWindowTitle)
@@ -723,7 +725,6 @@ class ResidentTest : Form
                     SetImePreset();
                 }
             }
-            SetIcon(ICON_GREEN);
         }
         if (imeEnabled)
         {
@@ -748,5 +749,6 @@ class ResidentTest : Form
             previousWindowTitle = foregroundWindowTitle;
             previousimeEnabled = imeEnabled;
         }
+        SetIcon(ICON_GREEN);
     }
 }
