@@ -41,6 +41,7 @@ class ResidentTest : Form
     static int previousIconColor = ICON_GREEN;
     static string previousWindowTitle;
     static string previousprocessName;
+    static string RegistrationprocessName;
     static bool ImeModeGlobal = true;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
@@ -50,6 +51,7 @@ class ResidentTest : Form
     static int delayRunBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
+    static string RegistrationWindowTitle;
     static readonly string[][] List = new string[5][];
     const int PassArray = 0;
     const int ImeOffArray = 1;
@@ -371,7 +373,7 @@ class ResidentTest : Form
             titleTextBox = new TextBox();
             titleTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(20 * Zoom));
             titleTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
-            titleTextBox.Text = "ウィンドウタイトルを表示";
+            titleTextBox.Text = RegistrationWindowTitle;
             appLabel = new Label();
             appLabel.Text = "アプリ名:";
             appLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
@@ -379,7 +381,7 @@ class ResidentTest : Form
             appTextBox = new TextBox();
             appTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(50 * Zoom));
             appTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
-            appTextBox.Text = "プロセス名を表示";
+            appTextBox.Text = RegistrationprocessName;
             titleRadioButton = new RadioButton();
             titleRadioButton.Text = "タイトル";
             titleRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
@@ -489,14 +491,14 @@ class ResidentTest : Form
         config.Save(ConfigurationSaveMode.Modified);
         ConfigurationManager.RefreshSection("appSettings");
 
-            if (mode.CompareTo("off") == 0)
-            {
-                ImeModeGlobal = true;
-            }
-            else
-            {
-                ImeModeGlobal = false;
-            }
+        if (mode.CompareTo("off") == 0)
+        {
+            ImeModeGlobal = true;
+        }
+        else
+        {
+            ImeModeGlobal = false;
+        }
     }
     private void ChangeIntervalAndSave(int interval)
     {
@@ -873,6 +875,13 @@ class ResidentTest : Form
                 {
                     SetImePreset();
                 }
+            }
+            // タスクバーをクリックするとタイトルが空欄のexplorerがヒット
+            // ＆ 自身のプロセスで上書きしない
+            if (foregroundprocessName != "explorer" && foregroundprocessName != "AlwaysIME")
+            {
+                RegistrationWindowTitle = foregroundWindowTitle;
+                RegistrationprocessName = foregroundprocessName;
             }
         }
         if (imeEnabled)
