@@ -512,6 +512,7 @@ class ResidentTest : Form
     private void Timer_Tick(object sender, EventArgs e)
     {
         MonitorActiveWindow();
+        RunBackgroundApp();
     }
     private void SetIcon(int param)
     {
@@ -830,10 +831,6 @@ class ResidentTest : Form
         {
             Debug.WriteLine($"{previousprocessName} はBackgroundAppListに含まれています");
             MonitorBackground(BackgroundArray);
-        }
-        else
-        {
-            RunBackgroundApp();
         }
         if (string.IsNullOrEmpty(foregroundWindowTitle))
         {
