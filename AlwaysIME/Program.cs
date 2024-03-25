@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.Drawing;
@@ -48,6 +49,7 @@ class ResidentTest : Form
     static int previousIconColor = ICON_GREEN;
     static string previousWindowTitle;
     static string previousprocessName;
+    static string RegistrationprocessName;
     static bool ImeModeGlobal = true;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
@@ -57,7 +59,8 @@ class ResidentTest : Form
     static int delayRunBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private string foregroundWindowTitle;
-    private readonly string[][] List = new string[5][];
+    static string RegistrationWindowTitle;
+    static readonly string[][] List = new string[5][];
     const int PassArray = 0;
     const int ImeOffArray = 1;
     const int ImeOffTitleArray = 2;
@@ -328,11 +331,135 @@ class ResidentTest : Form
         ToolStripSeparator separator3 = new ToolStripSeparator();
         menu.Items.Add(separator3);
 
+        ToolStripMenuItem MenuItemRegistrationDialog = new ToolStripMenuItem();
+        MenuItemRegistrationDialog.Text = "IMEオフに登録";
+        MenuItemRegistrationDialog.Click += MenuItemRegistrationDialog_Click;
+        menu.Items.Add(MenuItemRegistrationDialog);
+
+        ToolStripSeparator separator4 = new ToolStripSeparator();
+        menu.Items.Add(separator4);
+
         ToolStripMenuItem menuItem = new ToolStripMenuItem();
         menuItem.Text = "常駐の終了(&X)";
         menuItem.Click += new EventHandler(Close_Click);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
+    }
+    public class DialogForm : Form
+    {
+        private Label titleLabel;
+        private TextBox titleTextBox;
+        private Label appLabel;
+        private TextBox appTextBox;
+        private RadioButton titleRadioButton;
+        private RadioButton appRadioButton;
+        private Button okButton;
+        private Button cancelButton;
+
+        public DialogForm()
+        {
+            InitializeDialogComponents();
+        }
+
+        private void InitializeDialogComponents()
+        {
+            float Zoom;
+            using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
+                Zoom = graphics.DpiX / 96;
+            Font font = new Font("Meiryo", (int)(9 * Math.Pow(Zoom, 1.0 / 3.0)), FontStyle.Regular);
+            this.Text = "IMEオフに登録";
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.Size = new System.Drawing.Size((int)(440 * Zoom), (int)(200 * Zoom));
+
+            titleLabel = new Label();
+            titleLabel.Text = "タイトル:";
+            titleLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
+            titleLabel.Location = new System.Drawing.Point((int)(20 * Zoom), (int)(20 * Zoom));
+            titleTextBox = new TextBox();
+            titleTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(20 * Zoom));
+            titleTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
+            titleTextBox.Text = RegistrationWindowTitle;
+            appLabel = new Label();
+            appLabel.Text = "アプリ名:";
+            appLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
+            appLabel.Location = new System.Drawing.Point((int)(20 * Zoom), (int)(50 * Zoom));
+            appTextBox = new TextBox();
+            appTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(50 * Zoom));
+            appTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
+            appTextBox.Text = RegistrationprocessName;
+            titleRadioButton = new RadioButton();
+            titleRadioButton.Text = "タイトル";
+            titleRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
+            titleRadioButton.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(80 * Zoom));
+            appRadioButton = new RadioButton();
+            appRadioButton.Text = "アプリ名";
+            appRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
+            appRadioButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(80 * Zoom));
+            appRadioButton.Checked = true;
+            okButton = new Button();
+            okButton.Text = "登録(&R)";
+            okButton.Size = new System.Drawing.Size((int)(110 * Zoom), (int)(32 * Zoom));
+            okButton.DialogResult = DialogResult.OK;
+            okButton.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(110 * Zoom));
+            okButton.Click += OkButton_Click;
+            cancelButton = new Button();
+            cancelButton.Text = "キャンセル(&C)";
+            cancelButton.Size = new System.Drawing.Size((int)(110 * Zoom), (int)(32 * Zoom));
+            cancelButton.DialogResult = DialogResult.Cancel;
+            cancelButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(110 * Zoom));
+            this.Controls.Add(titleLabel);
+            this.Controls.Add(titleTextBox);
+            this.Controls.Add(appLabel);
+            this.Controls.Add(appTextBox);
+            this.Controls.Add(titleRadioButton);
+            this.Controls.Add(appRadioButton);
+            this.Controls.Add(okButton);
+            this.Controls.Add(cancelButton);
+            foreach (Control control in this.Controls)
+            {
+                control.Font = font;
+            }
+        }
+        private void OkButton_Click(object sender, EventArgs e)
+        {
+            string selectedOption = titleRadioButton.Checked ? "Title" : "App";
+            string title = titleTextBox.Text;
+            string app = appTextBox.Text;
+
+            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+            if (selectedOption == "Title")
+            {
+                List<string> list = new List<string>(List[ImeOffTitleArray]);
+                list.Add(Regex.Escape(title));
+                List[ImeOffTitleArray] = list.ToArray();
+                String buff = string.Join(",", List[ImeOffTitleArray]);
+                config.AppSettings.Settings["ImeOffTitle"].Value = buff;
+                config.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection("appSettings");
+                Debug.WriteLine("ImeOffTitleに追加：" + buff);
+            }
+            else if (selectedOption == "App")
+            {
+                List<string> list = new List<string>(List[ImeOffArray]);
+                list.Add(app);
+                List[ImeOffArray] = list.ToArray();
+                String buff = string.Join(",", List[ImeOffArray]);
+                buff = string.Join(",", List[ImeOffArray]);
+                config.AppSettings.Settings["ImeOffList"].Value = buff;
+                config.Save(ConfigurationSaveMode.Modified);
+                ConfigurationManager.RefreshSection("appSettings");
+                Debug.WriteLine("ImeOffListに追加：" + buff);
+            }
+        }
+    }
+    private void MenuItemRegistrationDialog_Click(object sender, EventArgs e)
+    {
+        using (var dialog = new DialogForm())
+        {
+            dialog.ShowDialog();
+        }
     }
     private void ResumeMenuItem_Click(object sender, EventArgs e)
     {
@@ -369,14 +496,14 @@ class ResidentTest : Form
         config.Save(ConfigurationSaveMode.Modified);
         ConfigurationManager.RefreshSection("appSettings");
 
-            if (mode.CompareTo("off") == 0)
-            {
-                ImeModeGlobal = true;
-            }
-            else
-            {
-                ImeModeGlobal = false;
-            }
+        if (mode.CompareTo("off") == 0)
+        {
+            ImeModeGlobal = true;
+        }
+        else
+        {
+            ImeModeGlobal = false;
+        }
     }
     private void ChangeIntervalAndSave(int interval)
     {
@@ -422,7 +549,7 @@ class ResidentTest : Form
             {
                 for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (foregroundprocessName.ToLower() == List[param][i].ToLower())
+                    if (foregroundprocessName.Equals(List[param][i], StringComparison.CurrentCultureIgnoreCase))
                     {
                         return true;
                     }
@@ -453,7 +580,7 @@ class ResidentTest : Form
             {
                 for (int i = 0; i < List[param].Length; i++)
                 {
-                    if (previousprocessName.ToLower() == List[param][i].ToLower())
+                    if (previousprocessName.Equals(List[param][i], StringComparison.CurrentCultureIgnoreCase))
                     {
                         return true;
                     }
@@ -753,6 +880,13 @@ class ResidentTest : Form
                 {
                     SetImePreset();
                 }
+            }
+            // タスクバーをクリックするとタイトルが空欄のexplorerがヒット
+            // ＆ 自身のプロセスで上書きしない
+            if (foregroundprocessName != "explorer" && foregroundprocessName != "AlwaysIME")
+            {
+                RegistrationWindowTitle = foregroundWindowTitle;
+                RegistrationprocessName = foregroundprocessName;
             }
         }
         if (imeEnabled)
