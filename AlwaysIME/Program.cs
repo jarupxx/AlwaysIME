@@ -24,7 +24,7 @@ class MainWindow
             ApplicationConfiguration.Initialize();
             ResidentTest rm = new ResidentTest();
             rm.InitializeAppConfig();
-            System.Windows.Forms.Application.Run();
+            Application.Run();
             mutex.ReleaseMutex();
         }
     }
@@ -80,7 +80,7 @@ class ResidentTest : Form
     private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
@@ -110,7 +110,7 @@ class ResidentTest : Form
         public IntPtr hwndMenuOwner;
         public IntPtr hwndMoveSize;
         public IntPtr hwndCaret;
-        public System.Drawing.Rectangle rcCaret;
+        public Rectangle rcCaret;
     }
 
     const int WM_IME_CONTROL = 0x283;
@@ -220,7 +220,7 @@ class ResidentTest : Form
         {
             if (!File.Exists(buff))
             {
-                System.Windows.Forms.MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
+                MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
             }
             else
             {
@@ -246,7 +246,7 @@ class ResidentTest : Form
         {
             if (!File.Exists(buff))
             {
-                System.Windows.Forms.MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
+                MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
                 ScheduleRunBackgroundApp = false;
             }
             else
@@ -274,7 +274,7 @@ class ResidentTest : Form
         }
         icon.Visible = false;
         icon.Dispose();
-        System.Windows.Forms.Application.Exit();
+        Application.Exit();
     }
     private void setComponents()
     {
@@ -369,44 +369,44 @@ class ResidentTest : Form
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Size = new System.Drawing.Size((int)(440 * Zoom), (int)(200 * Zoom));
+            this.Size = new Size((int)(440 * Zoom), (int)(200 * Zoom));
 
             titleLabel = new Label();
             titleLabel.Text = "タイトル:";
             titleLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
-            titleLabel.Location = new System.Drawing.Point((int)(20 * Zoom), (int)(20 * Zoom));
+            titleLabel.Location = new Point((int)(20 * Zoom), (int)(20 * Zoom));
             titleTextBox = new TextBox();
-            titleTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(20 * Zoom));
-            titleTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
+            titleTextBox.Location = new Point((int)(100 * Zoom), (int)(20 * Zoom));
+            titleTextBox.Size = new Size((int)(300 * Zoom), (int)(20 * Zoom));
             titleTextBox.Text = RegistrationWindowTitle;
             appLabel = new Label();
             appLabel.Text = "アプリ名:";
             appLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
-            appLabel.Location = new System.Drawing.Point((int)(20 * Zoom), (int)(50 * Zoom));
+            appLabel.Location = new Point((int)(20 * Zoom), (int)(50 * Zoom));
             appTextBox = new TextBox();
-            appTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(50 * Zoom));
-            appTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
+            appTextBox.Location = new Point((int)(100 * Zoom), (int)(50 * Zoom));
+            appTextBox.Size = new Size((int)(300 * Zoom), (int)(20 * Zoom));
             appTextBox.Text = RegistrationprocessName;
             titleRadioButton = new RadioButton();
             titleRadioButton.Text = "タイトル";
             titleRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
-            titleRadioButton.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(80 * Zoom));
+            titleRadioButton.Location = new Point((int)(100 * Zoom), (int)(80 * Zoom));
             appRadioButton = new RadioButton();
             appRadioButton.Text = "アプリ名";
             appRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
-            appRadioButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(80 * Zoom));
+            appRadioButton.Location = new Point((int)(220 * Zoom), (int)(80 * Zoom));
             appRadioButton.Checked = true;
             okButton = new Button();
             okButton.Text = "登録(&R)";
-            okButton.Size = new System.Drawing.Size((int)(110 * Zoom), (int)(32 * Zoom));
+            okButton.Size = new Size((int)(110 * Zoom), (int)(32 * Zoom));
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(110 * Zoom));
+            okButton.Location = new Point((int)(100 * Zoom), (int)(110 * Zoom));
             okButton.Click += OkButton_Click;
             cancelButton = new Button();
             cancelButton.Text = "キャンセル(&C)";
-            cancelButton.Size = new System.Drawing.Size((int)(110 * Zoom), (int)(32 * Zoom));
+            cancelButton.Size = new Size((int)(110 * Zoom), (int)(32 * Zoom));
             cancelButton.DialogResult = DialogResult.Cancel;
-            cancelButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(110 * Zoom));
+            cancelButton.Location = new Point((int)(220 * Zoom), (int)(110 * Zoom));
             this.Controls.Add(titleLabel);
             this.Controls.Add(titleTextBox);
             this.Controls.Add(appLabel);
