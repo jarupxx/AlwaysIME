@@ -267,6 +267,11 @@ class ResidentTest : Form
 
     private void Close_Click(object sender, EventArgs e)
     {
+        if (ScheduleRunBackgroundApp)
+        {
+            delayRunBackgroundApp = 1;
+            RunBackgroundApp();
+        }
         icon.Visible = false;
         icon.Dispose();
         System.Windows.Forms.Application.Exit();
