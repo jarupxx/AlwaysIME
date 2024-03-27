@@ -598,7 +598,7 @@ class ResidentTest : Form
         {
             if (!noKeyInput)
             {
-                Debug.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
+                Debug.WriteLine($"{noKeyInputInterval / 1000}秒間キーボードやマウス入力がありません");
                 if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
@@ -757,7 +757,7 @@ class ResidentTest : Form
             return;
         }
 
-        // キーボード未入力ならIMEの状態を復元する
+        // キーボードやマウス未入力ならIMEの状態を復元する
         CheckLastKeyInput();
 
         // プロセスの変更を追跡するために保存する
