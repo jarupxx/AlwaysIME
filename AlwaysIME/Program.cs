@@ -22,9 +22,9 @@ class MainWindow
         if (createdNew)
         {
             ApplicationConfiguration.Initialize();
+            ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
-            rm.InitializeAppConfig();
-            System.Windows.Forms.Application.Run();
+            Application.Run();
             mutex.ReleaseMutex();
         }
     }
@@ -43,6 +43,7 @@ class ResidentTest : Form
     static string previousprocessName;
     static string RegistrationprocessName;
     static bool ImeModeGlobal = true;
+    static bool darkModeEnabled = false;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
@@ -50,7 +51,7 @@ class ResidentTest : Form
     static bool ScheduleRunBackgroundApp = false;
     static int delayRunBackgroundApp = 2147483647;
     static string foregroundprocessName;
-    private string foregroundWindowTitle;
+    private static string foregroundWindowTitle;
     static string RegistrationWindowTitle;
     static readonly string[][] List = new string[5][];
     const int PassArray = 0;
@@ -58,15 +59,15 @@ class ResidentTest : Form
     const int ImeOffTitleArray = 2;
     const int OnActivatedAppArray = 3;
     const int BackgroundArray = 4;
-    private string RunOnActivatedAppPath;
-    private string RunOnActivatedArgv;
-    private string RunBackgroundAppPath;
-    private string FWBackgroundArgv;
-    private int imeInterval = 500;
-    private int SuspendFewInterval = 5;
-    private int SuspendInterval = 45;
-    private int DelayBackgroundInterval = 2147483647;
-    private int noKeyInputInterval = 6000;
+    private static string RunOnActivatedAppPath;
+    private static string RunOnActivatedArgv;
+    private static string RunBackgroundAppPath;
+    private static string FWBackgroundArgv;
+    private static int imeInterval = 500;
+    private static int SuspendFewInterval = 5;
+    private static int SuspendInterval = 45;
+    private static int DelayBackgroundInterval = 2147483647;
+    private static int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
     IntPtr imwd;
     int imeConvMode = 0;
@@ -148,7 +149,7 @@ class ResidentTest : Form
         this.lastInputTime = DateTime.Now;
     }
 
-    public void InitializeAppConfig()
+    public static void InitializeAppConfig()
     {
         List[PassArray] = null;
         List[ImeOffArray] = null;
@@ -171,7 +172,7 @@ class ResidentTest : Form
         {
             ImeModeGlobal = false;
         }
-        /*buff = ConfigurationManager.AppSettings["IsDarkMode"];
+        buff = ConfigurationManager.AppSettings["IsDarkMode"];
         if (!string.IsNullOrEmpty(buff))
         {
             if (buff.ToLower().CompareTo("on") == 0)
@@ -186,7 +187,7 @@ class ResidentTest : Form
         else
         {
             darkModeEnabled = false;
-        }*/
+        }
         buff = ConfigurationManager.AppSettings["PassList"];
         if (!string.IsNullOrEmpty(buff))
         {
@@ -340,7 +341,6 @@ class ResidentTest : Form
         menuItem.Text = "常駐の終了(&X)";
         menuItem.Click += new EventHandler(Close_Click);
 
-        bool darkModeEnabled = IsDarkModeEnabled();
         if (darkModeEnabled)
         {
             menuItemModeOn.BackColor = Color.FromArgb(32, 32, 32);
@@ -397,27 +397,6 @@ class ResidentTest : Form
             menu.Items.Add(separator4);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
-    }
-    private bool IsDarkModeEnabled()
-    {
-        {
-            String buff = ConfigurationManager.AppSettings["IsDarkMode"];
-            if (!string.IsNullOrEmpty(buff))
-            {
-                if (buff.ToLower().CompareTo("on") == 0)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
     }
     public class DialogForm : Form
     {
@@ -484,7 +463,6 @@ class ResidentTest : Form
             cancelButton.DialogResult = DialogResult.Cancel;
             cancelButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(110 * Zoom));
 
-            bool darkModeEnabled = IsDarkModeEnabled();
             if (darkModeEnabled)
             {
                 this.BackColor = Color.FromArgb(32, 32, 32);
@@ -537,25 +515,6 @@ class ResidentTest : Form
                 config.Save(ConfigurationSaveMode.Modified);
                 ConfigurationManager.RefreshSection("appSettings");
                 Debug.WriteLine("ImeOffListに追加：" + buff);
-            }
-        }
-        private bool IsDarkModeEnabled()
-        {
-            String buff = ConfigurationManager.AppSettings["IsDarkMode"];
-            if (!string.IsNullOrEmpty(buff))
-            {
-                if (buff.ToLower().CompareTo("on") == 0)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
-            else
-            {
-                return false;
             }
         }
     }
