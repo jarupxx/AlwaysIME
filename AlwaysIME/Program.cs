@@ -328,7 +328,7 @@ class ResidentTest : Form
         ToolStripSeparator separator2 = new ToolStripSeparator();
         menu.Items.Add(separator2);
 
-        ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新時間");
+        ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新間隔");
         ToolStripMenuItem menuItem250 = new ToolStripMenuItem("250 ms");
         menuItem250.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(250));
         ToolStripMenuItem menuItem500 = new ToolStripMenuItem("500 ms");
