@@ -1,3 +1,4 @@
+using Microsoft.Win32;
 using System.Configuration;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -72,7 +73,6 @@ class ResidentTest : Form
     IntPtr imwd;
     int imeConvMode = 0;
     bool imeEnabled = false;
-    // public bool darkModeEnabled = false;
     internal static readonly char[] separator = [','];
 
     [DllImport("user32.dll")]
@@ -82,7 +82,7 @@ class ResidentTest : Form
     private static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-    private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder lpString, int nMaxCount);
+    private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
     [DllImport("user32.dll")]
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
@@ -112,7 +112,7 @@ class ResidentTest : Form
         public IntPtr hwndMenuOwner;
         public IntPtr hwndMoveSize;
         public IntPtr hwndCaret;
-        public System.Drawing.Rectangle rcCaret;
+        public Rectangle rcCaret;
     }
 
     const int WM_IME_CONTROL = 0x283;
@@ -137,6 +137,18 @@ class ResidentTest : Form
     // 24 :Ａ 全角英数                     0001 1000
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
     // 27 :   全角カナ                     0001 1011
+
+    static int DefaultSpaceWidth;
+    static int SetSpaceMode;
+    const string keyPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
+    const string valueName = "InputSpace";
+    const RegistryValueKind valueType = RegistryValueKind.DWord;
+    const int IME_AUTO_WIDTH_SPACE = 0;
+    const int IME_FULL_WIDTH_SPACE = 1;
+    const int IME_HALF_WIDTH_SPACE = 2;
+    // 0: 現在の入力モード
+    // 1: 常に全角
+    // 2: 常に半角
 
     public ResidentTest()
     {
@@ -238,7 +250,7 @@ class ResidentTest : Form
         {
             if (!File.Exists(buff))
             {
-                System.Windows.Forms.MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
+                MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
             }
             else
             {
@@ -264,7 +276,7 @@ class ResidentTest : Form
         {
             if (!File.Exists(buff))
             {
-                System.Windows.Forms.MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
+                MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
                 ScheduleRunBackgroundApp = false;
             }
             else
@@ -281,13 +293,19 @@ class ResidentTest : Form
         {
             FWBackgroundArgv = buff;
         }
+        DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
+        SetSpaceMode = DefaultSpaceWidth;
     }
-
     private void Close_Click(object sender, EventArgs e)
     {
+        if (ScheduleRunBackgroundApp)
+        {
+            delayRunBackgroundApp = 1;
+            RunBackgroundApp();
+        }
         icon.Visible = false;
         icon.Dispose();
-        System.Windows.Forms.Application.Exit();
+        Application.Exit();
     }
     private void setComponents()
     {
@@ -300,11 +318,11 @@ class ResidentTest : Form
         ContextMenuStrip menu = new ContextMenuStrip();
 
         ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
-        suspendFewMenuItem.Text = "少し無効(&S)";
+        suspendFewMenuItem.Text = "少し無効(&P)";
         suspendFewMenuItem.Click += new EventHandler(SuspendFewMenuItem_Click);
 
         ToolStripMenuItem suspendMenuItem = new ToolStripMenuItem();
-        suspendMenuItem.Text = "しばらく無効(&P)";
+        suspendMenuItem.Text = "しばらく無効(&W)";
         suspendMenuItem.Click += new EventHandler(SuspendMenuItem_Click);
 
         ToolStripMenuItem resumeMenuItem = new ToolStripMenuItem();
@@ -321,7 +339,7 @@ class ResidentTest : Form
 
         ToolStripSeparator separator2 = new ToolStripSeparator();
 
-        ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新時間");
+        ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新間隔");
         ToolStripMenuItem menuItem250 = new ToolStripMenuItem("250 ms");
         menuItem250.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(250));
         ToolStripMenuItem menuItem500 = new ToolStripMenuItem("500 ms");
@@ -336,6 +354,12 @@ class ResidentTest : Form
         MenuItemRegistrationDialog.Click += MenuItemRegistrationDialog_Click;
 
         ToolStripSeparator separator4 = new ToolStripSeparator();
+
+        ToolStripMenuItem menuSpace = new ToolStripMenuItem();
+        menuSpace.Text = "スペース切替(&S)";
+        menuSpace.Click += new EventHandler(Space_Click);
+
+        ToolStripSeparator separator5 = new ToolStripSeparator();
 
         ToolStripMenuItem menuItem = new ToolStripMenuItem();
         menuItem.Text = "常駐の終了(&X)";
@@ -373,6 +397,10 @@ class ResidentTest : Form
             MenuItemRegistrationDialog.ForeColor = Color.White;
             separator4.BackColor = Color.FromArgb(32, 32, 32);
             separator4.ForeColor = Color.White;
+            menuSpace.BackColor = Color.FromArgb(32, 32, 32);
+            menuSpace.ForeColor = Color.White;
+            separator5.BackColor = Color.FromArgb(32, 32, 32);
+            separator5.ForeColor = Color.White;
             menuItem.BackColor = Color.FromArgb(32, 32, 32);
             menuItem.ForeColor = Color.White;
         }
@@ -395,6 +423,9 @@ class ResidentTest : Form
         menu.Items.Add(MenuItemRegistrationDialog);
         if (!darkModeEnabled)
             menu.Items.Add(separator4);
+        menu.Items.Add(menuSpace);
+                if (!darkModeEnabled)
+            menu.Items.Add(separator5);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
     }
@@ -424,42 +455,42 @@ class ResidentTest : Form
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Size = new System.Drawing.Size((int)(440 * Zoom), (int)(200 * Zoom));
+            this.Size = new Size((int)(440 * Zoom), (int)(200 * Zoom));
 
             titleLabel = new Label();
             titleLabel.Text = "タイトル:";
             titleLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
-            titleLabel.Location = new System.Drawing.Point((int)(20 * Zoom), (int)(20 * Zoom));
+            titleLabel.Location = new Point((int)(20 * Zoom), (int)(20 * Zoom));
             titleTextBox = new TextBox();
-            titleTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(20 * Zoom));
-            titleTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
+            titleTextBox.Location = new Point((int)(100 * Zoom), (int)(20 * Zoom));
+            titleTextBox.Size = new Size((int)(300 * Zoom), (int)(20 * Zoom));
             titleTextBox.Text = RegistrationWindowTitle;
             appLabel = new Label();
             appLabel.Text = "アプリ名:";
             appLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
-            appLabel.Location = new System.Drawing.Point((int)(20 * Zoom), (int)(50 * Zoom));
+            appLabel.Location = new Point((int)(20 * Zoom), (int)(50 * Zoom));
             appTextBox = new TextBox();
-            appTextBox.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(50 * Zoom));
-            appTextBox.Size = new System.Drawing.Size((int)(300 * Zoom), (int)(20 * Zoom));
+            appTextBox.Location = new Point((int)(100 * Zoom), (int)(50 * Zoom));
+            appTextBox.Size = new Size((int)(300 * Zoom), (int)(20 * Zoom));
             appTextBox.Text = RegistrationprocessName;
             titleRadioButton = new RadioButton();
             titleRadioButton.Text = "タイトル";
             titleRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
-            titleRadioButton.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(80 * Zoom));
+            titleRadioButton.Location = new Point((int)(100 * Zoom), (int)(80 * Zoom));
             appRadioButton = new RadioButton();
             appRadioButton.Text = "アプリ名";
             appRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
-            appRadioButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(80 * Zoom));
+            appRadioButton.Location = new Point((int)(220 * Zoom), (int)(80 * Zoom));
             appRadioButton.Checked = true;
             okButton = new Button();
             okButton.Text = "登録(&R)";
-            okButton.Size = new System.Drawing.Size((int)(110 * Zoom), (int)(32 * Zoom));
+            okButton.Size = new Size((int)(110 * Zoom), (int)(32 * Zoom));
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new System.Drawing.Point((int)(100 * Zoom), (int)(110 * Zoom));
+            okButton.Location = new Point((int)(100 * Zoom), (int)(110 * Zoom));
             okButton.Click += OkButton_Click;
             cancelButton = new Button();
             cancelButton.Text = "キャンセル(&C)";
-            cancelButton.Size = new System.Drawing.Size((int)(110 * Zoom), (int)(32 * Zoom));
+            cancelButton.Size = new Size((int)(110 * Zoom), (int)(32 * Zoom));
             cancelButton.DialogResult = DialogResult.Cancel;
             cancelButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(110 * Zoom));
 
@@ -523,6 +554,41 @@ class ResidentTest : Form
         using (var dialog = new DialogForm())
         {
             dialog.ShowDialog();
+        }
+    }
+    private void Space_Click(object sender, EventArgs e)
+    {
+        int newValue;
+        if (SetSpaceMode == IME_FULL_WIDTH_SPACE || SetSpaceMode == IME_AUTO_WIDTH_SPACE)
+        {
+            newValue = IME_HALF_WIDTH_SPACE;
+        }
+        else
+        {
+            newValue = IME_FULL_WIDTH_SPACE;
+        }
+        if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
+        {
+            switch (newValue)
+            {
+                case IME_AUTO_WIDTH_SPACE:
+                    Debug.WriteLine($"スペースを現在の入力モードにしました");
+                    break;
+                case IME_FULL_WIDTH_SPACE:
+                    Debug.WriteLine($"スペースを常に全角にしました");
+                    break;
+                case IME_HALF_WIDTH_SPACE:
+                    Debug.WriteLine($"スペースを常に半角にしました");
+                    break;
+                default:
+                    /* Nothing to do */
+                    break;
+            }
+            SetSpaceMode = newValue;
+        }
+        else
+        {
+            Trace.WriteLine("Failed to write registory.");
         }
     }
     private void ResumeMenuItem_Click(object sender, EventArgs e)
@@ -664,7 +730,7 @@ class ResidentTest : Form
         {
             if (!noKeyInput)
             {
-                Debug.WriteLine($"{noKeyInputInterval / 1000}秒間キーボード入力がありません");
+                Debug.WriteLine($"{noKeyInputInterval / 1000}秒間キーボードやマウス入力がありません");
                 if (CheckforegroundprocessName(ImeOffArray))
                 {
                     SetImeOffList();
@@ -792,7 +858,40 @@ class ResidentTest : Form
             }
         }
     }
-
+    static object ReadRegistryValue(RegistryHive hive, string keyPath, string valueName, RegistryValueKind valueType)
+    {
+        using (var regKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default).OpenSubKey(keyPath))
+        {
+            if (regKey != null)
+            {
+                object value = regKey.GetValue(valueName, null);
+                if (value != null && regKey.GetValueKind(valueName) == valueType)
+                {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+    static bool WriteRegistryValue(RegistryHive hive, string keyPath, string valueName, object value, RegistryValueKind valueType)
+    {
+        try
+        {
+            using (var regKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default).CreateSubKey(keyPath))
+            {
+                if (regKey != null)
+                {
+                    regKey.SetValue(valueName, value, valueType);
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error writing registry value: {ex.Message}");
+        }
+        return false;
+    }
     // 半角カナ/全角英数/カタカナ モードを強制的に「ひらがな」モードに変更する
     void MonitorActiveWindow()
     {
@@ -823,7 +922,7 @@ class ResidentTest : Form
             return;
         }
 
-        // キーボード未入力ならIMEの状態を復元する
+        // キーボードやマウス未入力ならIMEの状態を復元する
         CheckLastKeyInput();
 
         // プロセスの変更を追跡するために保存する

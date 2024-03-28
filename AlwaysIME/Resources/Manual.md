@@ -50,7 +50,7 @@ AlwaysIME.dll.config を参考に設定してください。
 
 - NoKeyInputTime
 
-  未入力でIMEオンにする時間を分（min）で指定します。
+  キーボードやマウス未入力でIMEオンにする時間を分（min）で指定します。
 
 - SuspendFewTime
 
