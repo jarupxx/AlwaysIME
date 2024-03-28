@@ -424,7 +424,7 @@ class ResidentTest : Form
         if (!darkModeEnabled)
             menu.Items.Add(separator4);
         menu.Items.Add(menuSpace);
-                if (!darkModeEnabled)
+        if (!darkModeEnabled)
             menu.Items.Add(separator5);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
