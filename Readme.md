@@ -20,6 +20,8 @@ IMEをオフにするアプリ名: IMEを自動でオフにするアプリケー
 
 IMEをオフにするタイトル: IMEをオフにするウィンドウのタイトルを指定します。
 
+ダークモードにする: AlwaysIME.dll.configの```"IsDarkMode"``` を ```value="on"``` に変更します。
+
 ## 詳細設定
 
 ResourcesフォルダーのManual.mdをご覧下さい。
@@ -33,3 +35,5 @@ Windows 10/11
 .NET デスクトップ ランタイム 8.0
 
 https://dotnet.microsoft.com/ja-jp/download
+
+Windows x64 Installer [直接リンク](https://download.visualstudio.microsoft.com/download/pr/e91876a9-1760-42cb-a6f4-97c57e9cca52/b433fcf4768929539f17e1908cb315bf/aspnetcore-runtime-8.0.3-win-x64.exe)

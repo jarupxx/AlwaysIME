@@ -23,8 +23,8 @@ class MainWindow
         if (createdNew)
         {
             ApplicationConfiguration.Initialize();
+            ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
-            rm.InitializeAppConfig();
             Application.Run();
             mutex.ReleaseMutex();
         }
@@ -44,6 +44,7 @@ class ResidentTest : Form
     static string previousprocessName;
     static string RegistrationprocessName;
     static bool ImeModeGlobal = true;
+    static bool darkModeEnabled = false;
     static bool previousimeEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
@@ -51,7 +52,7 @@ class ResidentTest : Form
     static bool ScheduleRunBackgroundApp = false;
     static int delayRunBackgroundApp = 2147483647;
     static string foregroundprocessName;
-    private string foregroundWindowTitle;
+    private static string foregroundWindowTitle;
     static string RegistrationWindowTitle;
     static readonly string[][] List = new string[5][];
     const int PassArray = 0;
@@ -59,15 +60,15 @@ class ResidentTest : Form
     const int ImeOffTitleArray = 2;
     const int OnActivatedAppArray = 3;
     const int BackgroundArray = 4;
-    private string RunOnActivatedAppPath;
-    private string RunOnActivatedArgv;
-    private string RunBackgroundAppPath;
-    private string FWBackgroundArgv;
-    private int imeInterval = 500;
-    private int SuspendFewInterval = 5;
-    private int SuspendInterval = 45;
-    private int DelayBackgroundInterval = 2147483647;
-    private int noKeyInputInterval = 6000;
+    private static string RunOnActivatedAppPath;
+    private static string RunOnActivatedArgv;
+    private static string RunBackgroundAppPath;
+    private static string FWBackgroundArgv;
+    private static int imeInterval = 500;
+    private static int SuspendFewInterval = 5;
+    private static int SuspendInterval = 45;
+    private static int DelayBackgroundInterval = 2147483647;
+    private static int noKeyInputInterval = 6000;
     private DateTime lastInputTime;
     IntPtr imwd;
     int imeConvMode = 0;
@@ -137,8 +138,8 @@ class ResidentTest : Form
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
     // 27 :   全角カナ                     0001 1011
 
-    int DefaultSpaceWidth;
-    int SetSpaceMode;
+    static int DefaultSpaceWidth;
+    static int SetSpaceMode;
     const string keyPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
     const string valueName = "InputSpace";
     const RegistryValueKind valueType = RegistryValueKind.DWord;
@@ -160,7 +161,7 @@ class ResidentTest : Form
         this.lastInputTime = DateTime.Now;
     }
 
-    public void InitializeAppConfig()
+    public static void InitializeAppConfig()
     {
         List[PassArray] = null;
         List[ImeOffArray] = null;
@@ -182,6 +183,22 @@ class ResidentTest : Form
         else
         {
             ImeModeGlobal = false;
+        }
+        buff = ConfigurationManager.AppSettings["IsDarkMode"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            if (buff.ToLower().CompareTo("on") == 0)
+            {
+                darkModeEnabled = true;
+            }
+            else
+            {
+                darkModeEnabled = false;
+            }
+        }
+        else
+        {
+            darkModeEnabled = false;
         }
         buff = ConfigurationManager.AppSettings["PassList"];
         if (!string.IsNullOrEmpty(buff))
@@ -303,30 +320,24 @@ class ResidentTest : Form
         ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
         suspendFewMenuItem.Text = "少し無効(&P)";
         suspendFewMenuItem.Click += new EventHandler(SuspendFewMenuItem_Click);
-        menu.Items.Add(suspendFewMenuItem);
+
         ToolStripMenuItem suspendMenuItem = new ToolStripMenuItem();
         suspendMenuItem.Text = "しばらく無効(&W)";
         suspendMenuItem.Click += new EventHandler(SuspendMenuItem_Click);
-        menu.Items.Add(suspendMenuItem);
+
         ToolStripMenuItem resumeMenuItem = new ToolStripMenuItem();
         resumeMenuItem.Text = "再度有効(&R)";
         resumeMenuItem.Click += new EventHandler(ResumeMenuItem_Click);
-        menu.Items.Add(resumeMenuItem);
 
         ToolStripSeparator separator1 = new ToolStripSeparator();
-        menu.Items.Add(separator1);
 
         ToolStripMenuItem updateModeMenuItem = new ToolStripMenuItem("IME Mode");
         ToolStripMenuItem menuItemModeOn = new ToolStripMenuItem("IMEオン");
         menuItemModeOn.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave("on"));
         ToolStripMenuItem menuItemModeOff = new ToolStripMenuItem("グローバル");
         menuItemModeOff.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave("off"));
-        updateModeMenuItem.DropDownItems.Add(menuItemModeOn);
-        updateModeMenuItem.DropDownItems.Add(menuItemModeOff);
-        menu.Items.Add(updateModeMenuItem);
 
         ToolStripSeparator separator2 = new ToolStripSeparator();
-        menu.Items.Add(separator2);
 
         ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新間隔");
         ToolStripMenuItem menuItem250 = new ToolStripMenuItem("250 ms");
@@ -335,33 +346,86 @@ class ResidentTest : Form
         menuItem500.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(500));
         ToolStripMenuItem menuItem1000 = new ToolStripMenuItem("1000 ms");
         menuItem1000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(1000));
-        updateTimeMenuItem.DropDownItems.Add(menuItem250);
-        updateTimeMenuItem.DropDownItems.Add(menuItem500);
-        updateTimeMenuItem.DropDownItems.Add(menuItem1000);
-        menu.Items.Add(updateTimeMenuItem);
 
         ToolStripSeparator separator3 = new ToolStripSeparator();
-        menu.Items.Add(separator3);
 
         ToolStripMenuItem MenuItemRegistrationDialog = new ToolStripMenuItem();
         MenuItemRegistrationDialog.Text = "IMEオフに登録";
         MenuItemRegistrationDialog.Click += MenuItemRegistrationDialog_Click;
-        menu.Items.Add(MenuItemRegistrationDialog);
 
         ToolStripSeparator separator4 = new ToolStripSeparator();
-        menu.Items.Add(separator4);
 
         ToolStripMenuItem menuSpace = new ToolStripMenuItem();
         menuSpace.Text = "スペース切替(&S)";
         menuSpace.Click += new EventHandler(Space_Click);
-        menu.Items.Add(menuSpace);
 
         ToolStripSeparator separator5 = new ToolStripSeparator();
-        menu.Items.Add(separator5);
 
         ToolStripMenuItem menuItem = new ToolStripMenuItem();
         menuItem.Text = "常駐の終了(&X)";
         menuItem.Click += new EventHandler(Close_Click);
+
+        if (darkModeEnabled)
+        {
+            menuItemModeOn.BackColor = Color.FromArgb(32, 32, 32);
+            menuItemModeOn.ForeColor = Color.White;
+            menuItemModeOff.BackColor = Color.FromArgb(32, 32, 32);
+            menuItemModeOff.ForeColor = Color.White;
+            menuItem250.BackColor = Color.FromArgb(32, 32, 32);
+            menuItem250.ForeColor = Color.White;
+            menuItem500.BackColor = Color.FromArgb(32, 32, 32);
+            menuItem500.ForeColor = Color.White;
+            menuItem1000.BackColor = Color.FromArgb(32, 32, 32);
+            menuItem1000.ForeColor = Color.White;
+            suspendFewMenuItem.BackColor = Color.FromArgb(32, 32, 32);
+            suspendFewMenuItem.ForeColor = Color.White;
+            suspendMenuItem.BackColor = Color.FromArgb(32, 32, 32);
+            suspendMenuItem.ForeColor = Color.White;
+            resumeMenuItem.BackColor = Color.FromArgb(32, 32, 32);
+            resumeMenuItem.ForeColor = Color.White;
+            separator1.BackColor = Color.FromArgb(32, 32, 32);
+            separator1.ForeColor = Color.White;
+            updateModeMenuItem.BackColor = Color.FromArgb(32, 32, 32);
+            updateModeMenuItem.ForeColor = Color.White;
+            separator2.BackColor = Color.FromArgb(32, 32, 32);
+            separator2.ForeColor = Color.White;
+            updateTimeMenuItem.BackColor = Color.FromArgb(32, 32, 32);
+            updateTimeMenuItem.ForeColor = Color.White;
+            separator3.BackColor = Color.FromArgb(32, 32, 32);
+            separator3.ForeColor = Color.White;
+            MenuItemRegistrationDialog.BackColor = Color.FromArgb(32, 32, 32);
+            MenuItemRegistrationDialog.ForeColor = Color.White;
+            separator4.BackColor = Color.FromArgb(32, 32, 32);
+            separator4.ForeColor = Color.White;
+            menuSpace.BackColor = Color.FromArgb(32, 32, 32);
+            menuSpace.ForeColor = Color.White;
+            separator5.BackColor = Color.FromArgb(32, 32, 32);
+            separator5.ForeColor = Color.White;
+            menuItem.BackColor = Color.FromArgb(32, 32, 32);
+            menuItem.ForeColor = Color.White;
+        }
+        updateModeMenuItem.DropDownItems.Add(menuItemModeOn);
+        updateModeMenuItem.DropDownItems.Add(menuItemModeOff);
+        updateTimeMenuItem.DropDownItems.Add(menuItem250);
+        updateTimeMenuItem.DropDownItems.Add(menuItem500);
+        updateTimeMenuItem.DropDownItems.Add(menuItem1000);
+        menu.Items.Add(suspendFewMenuItem);
+        menu.Items.Add(suspendMenuItem);
+        menu.Items.Add(resumeMenuItem);
+        if (!darkModeEnabled)
+            menu.Items.Add(separator1);
+        menu.Items.Add(updateModeMenuItem);
+        if (!darkModeEnabled)
+            menu.Items.Add(separator2);
+        menu.Items.Add(updateTimeMenuItem);
+        if (!darkModeEnabled)
+            menu.Items.Add(separator3);
+        menu.Items.Add(MenuItemRegistrationDialog);
+        if (!darkModeEnabled)
+            menu.Items.Add(separator4);
+        menu.Items.Add(menuSpace);
+        if (!darkModeEnabled)
+            menu.Items.Add(separator5);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
     }
@@ -386,7 +450,7 @@ class ResidentTest : Form
             float Zoom;
             using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
                 Zoom = graphics.DpiX / 96;
-            Font font = new Font("Meiryo", (int)(9 * Math.Pow(Zoom, 1.0 / 3.0)), FontStyle.Regular);
+            this.Font = new Font("Meiryo", (int)(9 * Math.Pow(Zoom, 1.0 / 3.0)), FontStyle.Regular);
             this.Text = "IMEオフに登録";
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -428,7 +492,22 @@ class ResidentTest : Form
             cancelButton.Text = "キャンセル(&C)";
             cancelButton.Size = new Size((int)(110 * Zoom), (int)(32 * Zoom));
             cancelButton.DialogResult = DialogResult.Cancel;
-            cancelButton.Location = new Point((int)(220 * Zoom), (int)(110 * Zoom));
+            cancelButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(110 * Zoom));
+
+            if (darkModeEnabled)
+            {
+                this.BackColor = Color.FromArgb(32, 32, 32);
+                this.ForeColor = Color.White;
+                titleTextBox.BackColor = Color.FromArgb(45, 45, 45);
+                titleTextBox.ForeColor = Color.White;
+                appTextBox.BackColor = Color.FromArgb(45, 45, 45);
+                appTextBox.ForeColor = Color.White;
+                okButton.BackColor = Color.FromArgb(55, 55, 55);
+                okButton.ForeColor = Color.White;
+                cancelButton.BackColor = Color.FromArgb(55, 55, 55);
+                cancelButton.ForeColor = Color.White;
+            }
+
             this.Controls.Add(titleLabel);
             this.Controls.Add(titleTextBox);
             this.Controls.Add(appLabel);
@@ -437,10 +516,6 @@ class ResidentTest : Form
             this.Controls.Add(appRadioButton);
             this.Controls.Add(okButton);
             this.Controls.Add(cancelButton);
-            foreach (Control control in this.Controls)
-            {
-                control.Font = font;
-            }
         }
         private void OkButton_Click(object sender, EventArgs e)
         {
