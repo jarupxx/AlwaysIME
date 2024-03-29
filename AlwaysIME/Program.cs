@@ -368,6 +368,16 @@ class ResidentTest : Form
             delayRunBackgroundApp = 1;
             RunBackgroundApp();
         }
+        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
+        {
+            SetPunctuationMode = val[ConfigPunctuation][1];
+            Punctuation_Click(this, e);
+        }
+        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        {
+            SetSpaceMode = val[ConfigSpaceWidth][1];
+            Space_Click(this, e);
+        }
         icon.Visible = false;
         icon.Dispose();
         Application.Exit();
