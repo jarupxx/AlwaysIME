@@ -139,7 +139,9 @@ class ResidentTest : Form
     // 27 :   全角カナ                     0001 1011
 
     static readonly int[][] val = new int[3][];
+    const int ConfigPunctuation = 0;
     const int ConfigSpaceWidth = 1;
+    static int SetPunctuationMode;
     static int SetSpaceMode;
     static readonly string[] keyPath = new string[2];
     static readonly string[] valueName = new string[2];
@@ -150,6 +152,22 @@ class ResidentTest : Form
     // 0: 現在の入力モード
     // 1: 常に全角
     // 2: 常に半角
+
+    private readonly string[] PunctuationText = ["，．", "、。", "、．", "，。"];
+    const int IME_COMMA_PERIOD = 0;
+    const int IME_TOUTEN_KUTENN = 1;
+    const int IME_TOUTEN_PERIOD = 2;
+    const int IME_COMMA_KUTENN = 3;
+    // 0001 01XX 0010 0000
+    // ビットマスク(mode >> 16) & 0x3
+    // 0001 0100 0010 0000	COMMA_PERIOD = 0
+    // 0001 0101 0010 0000	TOUTEN_KUTENN = 1
+    // 0001 0110 0010 0000	TOUTEN_PERIOD = 2
+    // 0001 0111 0010 0000	COMMA_KUTENN = 3
+    // 0: ，．
+    // 1: 、。
+    // 2: 、．
+    // 3: ，。
 
     public ResidentTest()
     {
@@ -169,7 +187,11 @@ class ResidentTest : Form
         List[ImeOffTitleArray] = null;
         List[OnActivatedAppArray] = null;
         List[BackgroundArray] = null;
+        val[ConfigPunctuation] = [0, 0];
         val[ConfigSpaceWidth] = [0, 0];
+        keyPath[ConfigPunctuation] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
+        valueName[ConfigPunctuation] = "option1";
+        valueType[ConfigPunctuation] = RegistryValueKind.DWord;
         keyPath[ConfigSpaceWidth] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
         valueName[ConfigSpaceWidth] = "InputSpace";
         valueType[ConfigSpaceWidth] = RegistryValueKind.DWord;
@@ -298,6 +320,18 @@ class ResidentTest : Form
         {
             FWBackgroundArgv = buff;
         }
+        buff = ConfigurationManager.AppSettings["Punctuation"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            int temp = 0x7FFCFFFF & (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], valueType[ConfigPunctuation]);
+            string[] parts = buff.Split(',');
+            val[ConfigPunctuation] = new int[2];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                val[ConfigPunctuation][i] = temp | int.Parse(parts[i]) << 16;
+            }
+            SetPunctuationMode = val[ConfigPunctuation][0];
+        }
         buff = ConfigurationManager.AppSettings["SpaceWidth"];
         if (!string.IsNullOrEmpty(buff))
         {
@@ -369,11 +403,17 @@ class ResidentTest : Form
 
         ToolStripSeparator separator4 = new ToolStripSeparator();
 
+        ToolStripMenuItem menuPunctuation = new ToolStripMenuItem();
+        menuPunctuation.Text = "句読点切替(&P)";
+        menuPunctuation.Click += new EventHandler(Punctuation_Click);
+
+        ToolStripSeparator separator5 = new ToolStripSeparator();
+
         ToolStripMenuItem menuSpace = new ToolStripMenuItem();
         menuSpace.Text = "スペース切替(&S)";
         menuSpace.Click += new EventHandler(Space_Click);
 
-        ToolStripSeparator separator5 = new ToolStripSeparator();
+        ToolStripSeparator separator6 = new ToolStripSeparator();
 
         ToolStripMenuItem menuItem = new ToolStripMenuItem();
         menuItem.Text = "常駐の終了(&X)";
@@ -411,10 +451,14 @@ class ResidentTest : Form
             MenuItemRegistrationDialog.ForeColor = Color.White;
             separator4.BackColor = Color.FromArgb(32, 32, 32);
             separator4.ForeColor = Color.White;
-            menuSpace.BackColor = Color.FromArgb(32, 32, 32);
-            menuSpace.ForeColor = Color.White;
+            menuPunctuation.BackColor = Color.FromArgb(32, 32, 32);
+            menuPunctuation.ForeColor = Color.White;
             separator5.BackColor = Color.FromArgb(32, 32, 32);
             separator5.ForeColor = Color.White;
+            menuSpace.BackColor = Color.FromArgb(32, 32, 32);
+            menuSpace.ForeColor = Color.White;
+            separator6.BackColor = Color.FromArgb(32, 32, 32);
+            separator6.ForeColor = Color.White;
             menuItem.BackColor = Color.FromArgb(32, 32, 32);
             menuItem.ForeColor = Color.White;
         }
@@ -435,14 +479,20 @@ class ResidentTest : Form
         if (!darkModeEnabled)
             menu.Items.Add(separator3);
         menu.Items.Add(MenuItemRegistrationDialog);
-        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
         {
             if (!darkModeEnabled)
                 menu.Items.Add(separator4);
+            menu.Items.Add(menuPunctuation);
+        }
+        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator5);
             menu.Items.Add(menuSpace);
         }
         if (!darkModeEnabled)
-            menu.Items.Add(separator5);
+            menu.Items.Add(separator6);
         menu.Items.Add(menuItem);
         icon.ContextMenuStrip = menu;
     }
@@ -571,6 +621,44 @@ class ResidentTest : Form
         using (var dialog = new DialogForm())
         {
             dialog.ShowDialog();
+        }
+    }
+    private void Punctuation_Click(object sender, EventArgs e)
+    {
+        int newValue;
+        if (SetPunctuationMode == val[ConfigPunctuation][0])
+        {
+            newValue = val[ConfigPunctuation][1];
+        }
+        else
+        {
+            newValue = val[ConfigPunctuation][0];
+        }
+        if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], newValue, valueType[ConfigPunctuation]))
+        {
+            switch ((newValue >> 16) & 0x3)
+            {
+                case IME_COMMA_PERIOD:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_COMMA_PERIOD] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                case IME_TOUTEN_KUTENN:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_TOUTEN_KUTENN] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                case IME_TOUTEN_PERIOD:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_TOUTEN_PERIOD] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                case IME_COMMA_KUTENN:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_COMMA_KUTENN] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                default:
+                    /* Nothing to do */
+                    break;
+            }
+            SetPunctuationMode = newValue;
+        }
+        else
+        {
+            Trace.WriteLine("Failed to write registory.");
         }
     }
     private void Space_Click(object sender, EventArgs e)
