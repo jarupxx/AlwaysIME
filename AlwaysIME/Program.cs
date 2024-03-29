@@ -329,7 +329,15 @@ class ResidentTest : Form
             val[ConfigPunctuation] = new int[2];
             for (int i = 0; i < parts.Length; i++)
             {
-                val[ConfigPunctuation][i] = temp | int.Parse(parts[i]) << 16;
+                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 3)
+                {
+                    val[ConfigPunctuation][i] = temp | int.Parse(parts[i]) << 16;
+                }
+                else
+                {
+                    MessageBox.Show("Punctuationの設定が間違っています");
+                    val[ConfigPunctuation] = [0, 0];
+                }
             }
             SetPunctuationMode = val[ConfigPunctuation][0];
         }
@@ -340,7 +348,15 @@ class ResidentTest : Form
             val[ConfigSpaceWidth] = new int[2];
             for (int i = 0; i < parts.Length; i++)
             {
-                val[ConfigSpaceWidth][i] = int.Parse(parts[i]);
+                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 2)
+                {
+                    val[ConfigSpaceWidth][i] = int.Parse(parts[i]);
+                }
+                else
+                {
+                    MessageBox.Show("SpaceWidthの設定が間違っています");
+                    val[ConfigSpaceWidth] = [0, 0];
+                }
             }
             SetSpaceMode = val[ConfigSpaceWidth][0];
         }
