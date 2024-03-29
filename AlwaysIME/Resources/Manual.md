@@ -116,6 +116,45 @@ AlwaysIME.dll.config を参考に設定してください。
 
   ```value="3"```
 
+- SpaceWidth（トグル）
+
+  メニューから句読点を切り替えられるようにします。「初期値 ⇔ 切替」をカンマ,で区切ります。不要なら```value=""```にして下さい。
+
+  この機能はレジストリ ```HKEY_CURRENT_USER\Software\Microsoft\IME\15.0\IMEJP\MSIME "option1" ```を書き換えます。
+
+  0:読点・句点「、。」
+
+  1:カンマ・ピリオド「，．」
+
+  2:読点・ピリオド「、．」
+
+  3:カンマ・句点「，。」
+
+  ```value="0,3"```
+
+- Punctuation（トグル）
+
+  メニューにスペースを切替られるようにします。「初期値 ⇔ 切替」をカンマ,で区切ります。不要なら```value=""```にして下さい。
+
+  この機能はレジストリ ```HKEY_CURRENT_USERHKEY_CURRENT_USER\Software\Microsoft\IME\15.0\IMEJP\MSIME "InputSpace" ```を書き換えます。
+
+
+  0：現在の入力モード
+
+  1：常に全角
+
+  2：常に半角
+
+  ```value="2,1"```
+
+- AppExit
+
+  メニューの常駐の終了の位置を移動します。
+
+  0：中ほど
+
+  1：一番下
+
 ## 仕様
 
   常駐型。

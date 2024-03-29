@@ -46,6 +46,7 @@ class ResidentTest : Form
     static bool ImeModeGlobal = true;
     static bool darkModeEnabled = false;
     static bool previousimeEnabled = true;
+    static bool AppExitEndEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
     static bool flagOnActivated = false;
@@ -138,17 +139,36 @@ class ResidentTest : Form
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
     // 27 :   全角カナ                     0001 1011
 
-    static int DefaultSpaceWidth;
+    static readonly int[][] val = new int[3][];
+    const int ConfigPunctuation = 0;
+    const int ConfigSpaceWidth = 1;
+    static int SetPunctuationMode;
     static int SetSpaceMode;
-    const string keyPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
-    const string valueName = "InputSpace";
-    const RegistryValueKind valueType = RegistryValueKind.DWord;
+    static readonly string[] keyPath = new string[2];
+    static readonly string[] valueName = new string[2];
+    static readonly RegistryValueKind[] valueType = new RegistryValueKind[2];
     const int IME_AUTO_WIDTH_SPACE = 0;
     const int IME_FULL_WIDTH_SPACE = 1;
     const int IME_HALF_WIDTH_SPACE = 2;
     // 0: 現在の入力モード
     // 1: 常に全角
     // 2: 常に半角
+
+    private readonly string[] PunctuationText = ["，．", "、。", "、．", "，。"];
+    const int IME_COMMA_PERIOD = 0;
+    const int IME_TOUTEN_KUTENN = 1;
+    const int IME_TOUTEN_PERIOD = 2;
+    const int IME_COMMA_KUTENN = 3;
+    // 0001 01XX 0010 0000
+    // ビットマスク(mode >> 16) & 0x3
+    // 0001 0100 0010 0000	COMMA_PERIOD = 0
+    // 0001 0101 0010 0000	TOUTEN_KUTENN = 1
+    // 0001 0110 0010 0000	TOUTEN_PERIOD = 2
+    // 0001 0111 0010 0000	COMMA_KUTENN = 3
+    // 0: ，．
+    // 1: 、。
+    // 2: 、．
+    // 3: ，。
 
     public ResidentTest()
     {
@@ -168,6 +188,14 @@ class ResidentTest : Form
         List[ImeOffTitleArray] = null;
         List[OnActivatedAppArray] = null;
         List[BackgroundArray] = null;
+        val[ConfigPunctuation] = [0, 0];
+        val[ConfigSpaceWidth] = [0, 0];
+        keyPath[ConfigPunctuation] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
+        valueName[ConfigPunctuation] = "option1";
+        valueType[ConfigPunctuation] = RegistryValueKind.DWord;
+        keyPath[ConfigSpaceWidth] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
+        valueName[ConfigSpaceWidth] = "InputSpace";
+        valueType[ConfigSpaceWidth] = RegistryValueKind.DWord;
         string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
         if (!string.IsNullOrEmpty(buff))
         {
@@ -293,8 +321,61 @@ class ResidentTest : Form
         {
             FWBackgroundArgv = buff;
         }
-        DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
-        SetSpaceMode = DefaultSpaceWidth;
+        buff = ConfigurationManager.AppSettings["Punctuation"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            int temp = 0x7FFCFFFF & (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], valueType[ConfigPunctuation]);
+            string[] parts = buff.Split(',');
+            val[ConfigPunctuation] = new int[2];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 3)
+                {
+                    val[ConfigPunctuation][i] = temp | int.Parse(parts[i]) << 16;
+                }
+                else
+                {
+                    MessageBox.Show("Punctuationの設定が間違っています");
+                    val[ConfigPunctuation] = [0, 0];
+                }
+            }
+            SetPunctuationMode = val[ConfigPunctuation][0];
+        }
+        buff = ConfigurationManager.AppSettings["SpaceWidth"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            string[] parts = buff.Split(',');
+            val[ConfigSpaceWidth] = new int[2];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 2)
+                {
+                    val[ConfigSpaceWidth][i] = int.Parse(parts[i]);
+                }
+                else
+                {
+                    MessageBox.Show("SpaceWidthの設定が間違っています");
+                    val[ConfigSpaceWidth] = [0, 0];
+                }
+            }
+            SetSpaceMode = val[ConfigSpaceWidth][0];
+        }
+        buff = ConfigurationManager.AppSettings["AppExitEnd"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            if (int.Parse(buff) == 1)
+            {
+                AppExitEndEnabled = true;
+            }
+            else/* if (int.Parse(buff) == 0)*/
+            {
+                AppExitEndEnabled = false;
+            }
+        }
+        else
+        {
+            AppExitEndEnabled = true;
+        }
     }
     private void Close_Click(object sender, EventArgs e)
     {
@@ -302,6 +383,16 @@ class ResidentTest : Form
         {
             delayRunBackgroundApp = 1;
             RunBackgroundApp();
+        }
+        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
+        {
+            SetPunctuationMode = val[ConfigPunctuation][1];
+            Punctuation_Click(this, e);
+        }
+        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        {
+            SetSpaceMode = val[ConfigSpaceWidth][1];
+            Space_Click(this, e);
         }
         icon.Visible = false;
         icon.Dispose();
@@ -318,7 +409,7 @@ class ResidentTest : Form
         ContextMenuStrip menu = new ContextMenuStrip();
 
         ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
-        suspendFewMenuItem.Text = "少し無効(&P)";
+        suspendFewMenuItem.Text = "少し無効(&D)";
         suspendFewMenuItem.Click += new EventHandler(SuspendFewMenuItem_Click);
 
         ToolStripMenuItem suspendMenuItem = new ToolStripMenuItem();
@@ -355,11 +446,17 @@ class ResidentTest : Form
 
         ToolStripSeparator separator4 = new ToolStripSeparator();
 
+        ToolStripMenuItem menuPunctuation = new ToolStripMenuItem();
+        menuPunctuation.Text = "句読点切替(&P)";
+        menuPunctuation.Click += new EventHandler(Punctuation_Click);
+
+        ToolStripSeparator separator5 = new ToolStripSeparator();
+
         ToolStripMenuItem menuSpace = new ToolStripMenuItem();
         menuSpace.Text = "スペース切替(&S)";
         menuSpace.Click += new EventHandler(Space_Click);
 
-        ToolStripSeparator separator5 = new ToolStripSeparator();
+        ToolStripSeparator separator6 = new ToolStripSeparator();
 
         ToolStripMenuItem menuItem = new ToolStripMenuItem();
         menuItem.Text = "常駐の終了(&X)";
@@ -397,10 +494,14 @@ class ResidentTest : Form
             MenuItemRegistrationDialog.ForeColor = Color.White;
             separator4.BackColor = Color.FromArgb(32, 32, 32);
             separator4.ForeColor = Color.White;
-            menuSpace.BackColor = Color.FromArgb(32, 32, 32);
-            menuSpace.ForeColor = Color.White;
+            menuPunctuation.BackColor = Color.FromArgb(32, 32, 32);
+            menuPunctuation.ForeColor = Color.White;
             separator5.BackColor = Color.FromArgb(32, 32, 32);
             separator5.ForeColor = Color.White;
+            menuSpace.BackColor = Color.FromArgb(32, 32, 32);
+            menuSpace.ForeColor = Color.White;
+            separator6.BackColor = Color.FromArgb(32, 32, 32);
+            separator6.ForeColor = Color.White;
             menuItem.BackColor = Color.FromArgb(32, 32, 32);
             menuItem.ForeColor = Color.White;
         }
@@ -415,18 +516,36 @@ class ResidentTest : Form
         if (!darkModeEnabled)
             menu.Items.Add(separator1);
         menu.Items.Add(updateModeMenuItem);
+        if (!AppExitEndEnabled)
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator6);
+            menu.Items.Add(menuItem);
+        }
         if (!darkModeEnabled)
             menu.Items.Add(separator2);
         menu.Items.Add(updateTimeMenuItem);
         if (!darkModeEnabled)
             menu.Items.Add(separator3);
         menu.Items.Add(MenuItemRegistrationDialog);
-        if (!darkModeEnabled)
-            menu.Items.Add(separator4);
-        menu.Items.Add(menuSpace);
-        if (!darkModeEnabled)
-            menu.Items.Add(separator5);
-        menu.Items.Add(menuItem);
+        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator4);
+            menu.Items.Add(menuPunctuation);
+        }
+        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator5);
+            menu.Items.Add(menuSpace);
+        }
+        if (AppExitEndEnabled)
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator6);
+            menu.Items.Add(menuItem);
+        }
         icon.ContextMenuStrip = menu;
     }
     public class DialogForm : Form
@@ -556,18 +675,56 @@ class ResidentTest : Form
             dialog.ShowDialog();
         }
     }
-    private void Space_Click(object sender, EventArgs e)
+    private void Punctuation_Click(object sender, EventArgs e)
     {
         int newValue;
-        if (SetSpaceMode == IME_FULL_WIDTH_SPACE || SetSpaceMode == IME_AUTO_WIDTH_SPACE)
+        if (SetPunctuationMode == val[ConfigPunctuation][0])
         {
-            newValue = IME_HALF_WIDTH_SPACE;
+            newValue = val[ConfigPunctuation][1];
         }
         else
         {
-            newValue = IME_FULL_WIDTH_SPACE;
+            newValue = val[ConfigPunctuation][0];
         }
-        if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
+        if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], newValue, valueType[ConfigPunctuation]))
+        {
+            switch ((newValue >> 16) & 0x3)
+            {
+                case IME_COMMA_PERIOD:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_COMMA_PERIOD] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                case IME_TOUTEN_KUTENN:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_TOUTEN_KUTENN] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                case IME_TOUTEN_PERIOD:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_TOUTEN_PERIOD] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                case IME_COMMA_KUTENN:
+                    Debug.WriteLine($"句読点を「" + PunctuationText[IME_COMMA_KUTENN] + "」にしました 0x{0:X8}", newValue);
+                    break;
+                default:
+                    /* Nothing to do */
+                    break;
+            }
+            SetPunctuationMode = newValue;
+        }
+        else
+        {
+            Trace.WriteLine("Failed to write registory.");
+        }
+    }
+    private void Space_Click(object sender, EventArgs e)
+    {
+        int newValue;
+        if (SetSpaceMode == val[ConfigSpaceWidth][0])
+        {
+            newValue = val[ConfigSpaceWidth][1];
+        }
+        else
+        {
+            newValue = val[ConfigSpaceWidth][0];
+        }
+        if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigSpaceWidth], valueName[ConfigSpaceWidth], newValue, valueType[ConfigSpaceWidth]))
         {
             switch (newValue)
             {
