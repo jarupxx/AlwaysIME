@@ -46,6 +46,7 @@ class ResidentTest : Form
     static bool ImeModeGlobal = true;
     static bool darkModeEnabled = false;
     static bool previousimeEnabled = true;
+    static bool AppExitEndEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
     static bool flagOnActivated = false;
@@ -343,6 +344,22 @@ class ResidentTest : Form
             }
             SetSpaceMode = val[ConfigSpaceWidth][0];
         }
+        buff = ConfigurationManager.AppSettings["AppExitEnd"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            if (int.Parse(buff) == 1)
+            {
+                AppExitEndEnabled = true;
+            }
+            else/* if (int.Parse(buff) == 0)*/
+            {
+                AppExitEndEnabled = false;
+            }
+        }
+        else
+        {
+            AppExitEndEnabled = true;
+        }
     }
     private void Close_Click(object sender, EventArgs e)
     {
@@ -473,6 +490,12 @@ class ResidentTest : Form
         if (!darkModeEnabled)
             menu.Items.Add(separator1);
         menu.Items.Add(updateModeMenuItem);
+        if (!AppExitEndEnabled)
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator6);
+            menu.Items.Add(menuItem);
+        }
         if (!darkModeEnabled)
             menu.Items.Add(separator2);
         menu.Items.Add(updateTimeMenuItem);
@@ -491,9 +514,12 @@ class ResidentTest : Form
                 menu.Items.Add(separator5);
             menu.Items.Add(menuSpace);
         }
-        if (!darkModeEnabled)
-            menu.Items.Add(separator6);
-        menu.Items.Add(menuItem);
+        if (AppExitEndEnabled)
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator6);
+            menu.Items.Add(menuItem);
+        }
         icon.ContextMenuStrip = menu;
     }
     public class DialogForm : Form
