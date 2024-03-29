@@ -138,11 +138,12 @@ class ResidentTest : Form
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
     // 27 :   全角カナ                     0001 1011
 
-    static int DefaultSpaceWidth;
+    static readonly int[][] val = new int[3][];
+    const int ConfigSpaceWidth = 1;
     static int SetSpaceMode;
-    const string keyPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
-    const string valueName = "InputSpace";
-    const RegistryValueKind valueType = RegistryValueKind.DWord;
+    static readonly string[] keyPath = new string[2];
+    static readonly string[] valueName = new string[2];
+    static readonly RegistryValueKind[] valueType = new RegistryValueKind[2];
     const int IME_AUTO_WIDTH_SPACE = 0;
     const int IME_FULL_WIDTH_SPACE = 1;
     const int IME_HALF_WIDTH_SPACE = 2;
@@ -168,6 +169,10 @@ class ResidentTest : Form
         List[ImeOffTitleArray] = null;
         List[OnActivatedAppArray] = null;
         List[BackgroundArray] = null;
+        val[ConfigSpaceWidth] = [0, 0];
+        keyPath[ConfigSpaceWidth] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
+        valueName[ConfigSpaceWidth] = "InputSpace";
+        valueType[ConfigSpaceWidth] = RegistryValueKind.DWord;
         string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
         if (!string.IsNullOrEmpty(buff))
         {
@@ -293,8 +298,17 @@ class ResidentTest : Form
         {
             FWBackgroundArgv = buff;
         }
-        DefaultSpaceWidth = (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, valueType);
-        SetSpaceMode = DefaultSpaceWidth;
+        buff = ConfigurationManager.AppSettings["SpaceWidth"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            string[] parts = buff.Split(',');
+            val[ConfigSpaceWidth] = new int[2];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                val[ConfigSpaceWidth][i] = int.Parse(parts[i]);
+            }
+            SetSpaceMode = val[ConfigSpaceWidth][0];
+        }
     }
     private void Close_Click(object sender, EventArgs e)
     {
@@ -421,9 +435,12 @@ class ResidentTest : Form
         if (!darkModeEnabled)
             menu.Items.Add(separator3);
         menu.Items.Add(MenuItemRegistrationDialog);
-        if (!darkModeEnabled)
-            menu.Items.Add(separator4);
-        menu.Items.Add(menuSpace);
+        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        {
+            if (!darkModeEnabled)
+                menu.Items.Add(separator4);
+            menu.Items.Add(menuSpace);
+        }
         if (!darkModeEnabled)
             menu.Items.Add(separator5);
         menu.Items.Add(menuItem);
@@ -559,15 +576,15 @@ class ResidentTest : Form
     private void Space_Click(object sender, EventArgs e)
     {
         int newValue;
-        if (SetSpaceMode == IME_FULL_WIDTH_SPACE || SetSpaceMode == IME_AUTO_WIDTH_SPACE)
+        if (SetSpaceMode == val[ConfigSpaceWidth][0])
         {
-            newValue = IME_HALF_WIDTH_SPACE;
+            newValue = val[ConfigSpaceWidth][1];
         }
         else
         {
-            newValue = IME_FULL_WIDTH_SPACE;
+            newValue = val[ConfigSpaceWidth][0];
         }
-        if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath, valueName, newValue, valueType))
+        if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigSpaceWidth], valueName[ConfigSpaceWidth], newValue, valueType[ConfigSpaceWidth]))
         {
             switch (newValue)
             {
