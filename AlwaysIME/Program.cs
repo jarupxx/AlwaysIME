@@ -647,7 +647,7 @@ class ResidentTest : Form
             {
                 List<string> list = new List<string>(List[ImeOffTitleArray]);
                 list.Add(Regex.Escape(title));
-                List[ImeOffTitleArray] = list.ToArray();
+                List[ImeOffTitleArray] = list.Distinct().ToArray();
                 String buff = string.Join(",", List[ImeOffTitleArray]);
                 config.AppSettings.Settings["ImeOffTitle"].Value = buff;
                 config.Save(ConfigurationSaveMode.Modified);
@@ -658,7 +658,7 @@ class ResidentTest : Form
             {
                 List<string> list = new List<string>(List[ImeOffArray]);
                 list.Add(app);
-                List[ImeOffArray] = list.ToArray();
+                List[ImeOffArray] = list.Distinct().ToArray();
                 String buff = string.Join(",", List[ImeOffArray]);
                 buff = string.Join(",", List[ImeOffArray]);
                 config.AppSettings.Settings["ImeOffList"].Value = buff;
