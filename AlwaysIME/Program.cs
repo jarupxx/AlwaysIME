@@ -366,7 +366,7 @@ class ResidentTest : Form
         ContextMenuStrip menu = new ContextMenuStrip();
 
         ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
-        suspendFewMenuItem.Text = "少し無効(&P)";
+        suspendFewMenuItem.Text = "少し無効(&D)";
         suspendFewMenuItem.Click += new EventHandler(SuspendFewMenuItem_Click);
 
         ToolStripMenuItem suspendMenuItem = new ToolStripMenuItem();
