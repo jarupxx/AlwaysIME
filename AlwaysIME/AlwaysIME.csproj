@@ -10,7 +10,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <Description>IMEオンにするツール</Description>
     <Copyright>Copyright © jarupxx 2024</Copyright>
-    <VersionPrefix>0.6</VersionPrefix>
+    <VersionPrefix>0.6.2</VersionPrefix>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <NeutralLanguage>ja-JP</NeutralLanguage>
     <ApplicationVisualStyles>true</ApplicationVisualStyles>
