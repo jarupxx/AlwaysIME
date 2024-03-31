@@ -65,7 +65,7 @@ class ResidentTest : Form
     private static string RunOnActivatedArgv;
     private static string RunBackgroundAppPath;
     private static string FWBackgroundArgv;
-    private static int imeInterval = 500;
+    private static int imeInterval = 200;
     private static int SuspendFewInterval = 5;
     private static int SuspendInterval = 45;
     private static int DelayBackgroundInterval = 2147483647;
@@ -431,12 +431,12 @@ class ResidentTest : Form
         ToolStripSeparator separator2 = new ToolStripSeparator();
 
         ToolStripMenuItem updateTimeMenuItem = new ToolStripMenuItem("更新間隔");
-        ToolStripMenuItem menuItem250 = new ToolStripMenuItem("250 ms");
-        menuItem250.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(250));
-        ToolStripMenuItem menuItem500 = new ToolStripMenuItem("500 ms");
-        menuItem500.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(500));
-        ToolStripMenuItem menuItem1000 = new ToolStripMenuItem("1000 ms");
-        menuItem1000.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(1000));
+        ToolStripMenuItem menuInterval1 = new ToolStripMenuItem("100 ms");
+        menuInterval1.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(100));
+        ToolStripMenuItem menuInterval2 = new ToolStripMenuItem("200 ms");
+        menuInterval2.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(200));
+        ToolStripMenuItem menuInterval3 = new ToolStripMenuItem("500 ms");
+        menuInterval3.Click += new EventHandler((sender, e) => ChangeIntervalAndSave(500));
 
         ToolStripSeparator separator3 = new ToolStripSeparator();
 
@@ -468,12 +468,12 @@ class ResidentTest : Form
             menuItemModeOn.ForeColor = Color.White;
             menuItemModeOff.BackColor = Color.FromArgb(32, 32, 32);
             menuItemModeOff.ForeColor = Color.White;
-            menuItem250.BackColor = Color.FromArgb(32, 32, 32);
-            menuItem250.ForeColor = Color.White;
-            menuItem500.BackColor = Color.FromArgb(32, 32, 32);
-            menuItem500.ForeColor = Color.White;
-            menuItem1000.BackColor = Color.FromArgb(32, 32, 32);
-            menuItem1000.ForeColor = Color.White;
+            menuInterval1.BackColor = Color.FromArgb(32, 32, 32);
+            menuInterval1.ForeColor = Color.White;
+            menuInterval2.BackColor = Color.FromArgb(32, 32, 32);
+            menuInterval2.ForeColor = Color.White;
+            menuInterval3.BackColor = Color.FromArgb(32, 32, 32);
+            menuInterval3.ForeColor = Color.White;
             suspendFewMenuItem.BackColor = Color.FromArgb(32, 32, 32);
             suspendFewMenuItem.ForeColor = Color.White;
             suspendMenuItem.BackColor = Color.FromArgb(32, 32, 32);
@@ -507,9 +507,9 @@ class ResidentTest : Form
         }
         updateModeMenuItem.DropDownItems.Add(menuItemModeOn);
         updateModeMenuItem.DropDownItems.Add(menuItemModeOff);
-        updateTimeMenuItem.DropDownItems.Add(menuItem250);
-        updateTimeMenuItem.DropDownItems.Add(menuItem500);
-        updateTimeMenuItem.DropDownItems.Add(menuItem1000);
+        updateTimeMenuItem.DropDownItems.Add(menuInterval1);
+        updateTimeMenuItem.DropDownItems.Add(menuInterval2);
+        updateTimeMenuItem.DropDownItems.Add(menuInterval3);
         menu.Items.Add(suspendFewMenuItem);
         menu.Items.Add(suspendMenuItem);
         menu.Items.Add(resumeMenuItem);
