@@ -36,6 +36,8 @@ class ResidentTest : Form
     private System.Windows.Forms.Timer timer;
     private NotifyIcon icon;
     private int iconsize;
+    private ToolStripMenuItem menuPunctuation;
+    private ToolStripMenuItem menuSpace;
     const int ICON_RED = 0;
     const int ICON_GREEN = 1;
     const int ICON_GRAY = 2;
@@ -147,6 +149,8 @@ class ResidentTest : Form
     static readonly string[] keyPath = new string[2];
     static readonly string[] valueName = new string[2];
     static readonly RegistryValueKind[] valueType = new RegistryValueKind[2];
+    // 0: は「現在の入力モード」だが「ひらがな（漢字変換モード）」しか想定していないので全角スペースとする
+    private readonly string[] SpaceWidthText = ["全角", "全角", "半角"];
     const int IME_AUTO_WIDTH_SPACE = 0;
     const int IME_FULL_WIDTH_SPACE = 1;
     const int IME_HALF_WIDTH_SPACE = 2;
@@ -446,14 +450,17 @@ class ResidentTest : Form
 
         ToolStripSeparator separator4 = new ToolStripSeparator();
 
-        ToolStripMenuItem menuPunctuation = new ToolStripMenuItem();
-        menuPunctuation.Text = "句読点切替(&P)";
+        menuPunctuation = new ToolStripMenuItem();
+        // menuPunctuation.Text = "句読点切替(&P)";
+        menuPunctuation.Text = "「" + PunctuationText[(val[ConfigPunctuation][1] >> 16) & 0x3] + "」に切替(&P)";
         menuPunctuation.Click += new EventHandler(Punctuation_Click);
 
         ToolStripSeparator separator5 = new ToolStripSeparator();
 
-        ToolStripMenuItem menuSpace = new ToolStripMenuItem();
-        menuSpace.Text = "スペース切替(&S)";
+        menuSpace = new ToolStripMenuItem();
+        // menuSpace.Text = "スペース切替(&S)";
+        menuSpace.Text = SpaceWidthText[val[ConfigSpaceWidth][1]] + "スペースに切替(&S)";
+
         menuSpace.Click += new EventHandler(Space_Click);
 
         ToolStripSeparator separator6 = new ToolStripSeparator();
@@ -681,10 +688,12 @@ class ResidentTest : Form
         if (SetPunctuationMode == val[ConfigPunctuation][0])
         {
             newValue = val[ConfigPunctuation][1];
+            menuPunctuation.Text = "「" + PunctuationText[(val[ConfigPunctuation][0] >> 16) & 0x3] + "」に切替(&P)";
         }
         else
         {
             newValue = val[ConfigPunctuation][0];
+            menuPunctuation.Text = "「" + PunctuationText[(val[ConfigPunctuation][1] >> 16) & 0x3] + "」に切替(&P)";
         }
         if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], newValue, valueType[ConfigPunctuation]))
         {
@@ -719,10 +728,12 @@ class ResidentTest : Form
         if (SetSpaceMode == val[ConfigSpaceWidth][0])
         {
             newValue = val[ConfigSpaceWidth][1];
+            menuSpace.Text = SpaceWidthText[val[ConfigSpaceWidth][0]] + "スペースに切替(&S)";
         }
         else
         {
             newValue = val[ConfigSpaceWidth][0];
+            menuSpace.Text = SpaceWidthText[val[ConfigSpaceWidth][1]] + "スペースに切替(&S)";
         }
         if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigSpaceWidth], valueName[ConfigSpaceWidth], newValue, valueType[ConfigSpaceWidth]))
         {
@@ -732,10 +743,10 @@ class ResidentTest : Form
                     Debug.WriteLine($"スペースを現在の入力モードにしました");
                     break;
                 case IME_FULL_WIDTH_SPACE:
-                    Debug.WriteLine($"スペースを常に全角にしました");
+                    Debug.WriteLine($"スペースを常に" + SpaceWidthText[IME_FULL_WIDTH_SPACE] + "にしました");
                     break;
                 case IME_HALF_WIDTH_SPACE:
-                    Debug.WriteLine($"スペースを常に半角にしました");
+                    Debug.WriteLine($"スペースを常に" + SpaceWidthText[IME_HALF_WIDTH_SPACE] + "にしました");
                     break;
                 default:
                     /* Nothing to do */
