@@ -138,6 +138,16 @@ class ResidentTest : Form
     // 24 :Ａ 全角英数                     0001 1000
     // 25 :あ ひらがな（漢字変換モード）   0001 1001
     // 27 :   全角カナ                     0001 1011
+    const int CModeMS_HankakuKana = IME_CMODE_KATAKANA | IME_CMODE_NATIVE;
+    const int CModeMS_ZenkakuEisu = IME_CMODE_FULLSHAPE;
+    const int CModeMS_Hiragana = IME_CMODE_FULLSHAPE | IME_CMODE_NATIVE;
+    const int CModeMS_ZenkakuKana = IME_CMODE_FULLSHAPE | IME_CMODE_KATAKANA | IME_CMODE_NATIVE;
+    // MS-IMEはIME_CMODE_ROMANが立たなくなった (2024/4)
+    // 00 :× IMEが無効です                0000 0000
+    // 03 :カ 半角カナ                     0000 0011
+    // 08 :Ａ 全角英数                     0000 1000
+    // 09 :あ ひらがな（漢字変換モード）   0000 1001
+    // 11 :   全角カナ                     0000 1011
 
     static readonly int[][] val = new int[3][];
     const int ConfigPunctuation = 0;
@@ -1211,15 +1221,19 @@ class ResidentTest : Form
             switch (imeConvMode)
             {
                 case CMode_Hiragana:
+                case CModeMS_Hiragana:
                     /* Nothing to do */
                     break;
                 case CMode_HankakuKana: /* through */
                 case CMode_ZenkakuEisu: /* through */
-                case CMode_ZenkakuKana:
+                case CMode_ZenkakuKana: /* through */
+                case CModeMS_HankakuKana: /* through */
+                case CModeMS_ZenkakuEisu: /* through */
+                case CModeMS_ZenkakuKana:
                     SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETCONVERSIONMODE, (IntPtr)CMode_Hiragana); // ひらがなモードに設定
                     break;
                 default:
-                    /* Nothing to do */
+                    Debug.WriteLine($"不明な status code:{imeConvMode}");
                     /* 環境によっては上のcaseをやめてここに飛ばしたほうがよいかも */
                     break;
             }
