@@ -45,7 +45,10 @@ class ResidentTest : Form
     static string previousWindowTitle;
     static string previousprocessName;
     static string RegistrationprocessName;
-    static bool ImeModeGlobal = true;
+    const int IMEMODE_ON = 1;
+    const int IMEMODE_OFF = 2;
+    const int IMEMODE_GLOBAL = 3;
+    static int ImeModeGlobal = IMEMODE_ON;
     static bool darkModeEnabled = false;
     static bool previousimeEnabled = true;
     static bool AppExitEndEnabled = true;
@@ -213,18 +216,32 @@ class ResidentTest : Form
         string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
         if (!string.IsNullOrEmpty(buff))
         {
+            // 互換設定
             if (buff.ToLower().CompareTo("off") == 0)
             {
-                ImeModeGlobal = true;
+                ImeModeGlobal = IMEMODE_GLOBAL;
+            }
+            else if (buff.ToLower().CompareTo("on") == 0)
+
+            {
+                ImeModeGlobal = IMEMODE_ON;
             }
             else
             {
-                ImeModeGlobal = false;
+                if (int.Parse(buff) >= 1 && int.Parse(buff) <= 3)
+                {
+                    ImeModeGlobal = int.Parse(buff);
+                }
+                else
+                {
+                    MessageBox.Show("AlwaysIMEModeの設定が間違っています");
+                    ImeModeGlobal = IMEMODE_ON;
+                }
             }
         }
         else
         {
-            ImeModeGlobal = false;
+            ImeModeGlobal = IMEMODE_ON;
         }
         buff = ConfigurationManager.AppSettings["IsDarkMode"];
         if (!string.IsNullOrEmpty(buff))
@@ -438,9 +455,12 @@ class ResidentTest : Form
 
         ToolStripMenuItem updateModeMenuItem = new ToolStripMenuItem("IME Mode");
         ToolStripMenuItem menuItemModeOn = new ToolStripMenuItem("IMEオン");
-        menuItemModeOn.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave("on"));
-        ToolStripMenuItem menuItemModeOff = new ToolStripMenuItem("グローバル");
-        menuItemModeOff.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave("off"));
+        menuItemModeOn.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave(IMEMODE_ON));
+        ToolStripMenuItem menuItemModeOff = new ToolStripMenuItem("IMEオフ");
+        menuItemModeOff.Enabled = false;
+        menuItemModeOff.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave(IMEMODE_OFF));
+        ToolStripMenuItem menuItemModeGlobal = new ToolStripMenuItem("グローバル");
+        menuItemModeGlobal.Click += new EventHandler((sender, e) => ChangeAlwaysIMEModeAndSave(IMEMODE_GLOBAL));
 
         ToolStripSeparator separator2 = new ToolStripSeparator();
 
@@ -485,6 +505,8 @@ class ResidentTest : Form
             menuItemModeOn.ForeColor = Color.White;
             menuItemModeOff.BackColor = Color.FromArgb(32, 32, 32);
             menuItemModeOff.ForeColor = Color.White;
+            menuItemModeGlobal.BackColor = Color.FromArgb(32, 32, 32);
+            menuItemModeGlobal.ForeColor = Color.White;
             menuInterval1.BackColor = Color.FromArgb(32, 32, 32);
             menuInterval1.ForeColor = Color.White;
             menuInterval2.BackColor = Color.FromArgb(32, 32, 32);
@@ -524,6 +546,7 @@ class ResidentTest : Form
         }
         updateModeMenuItem.DropDownItems.Add(menuItemModeOn);
         updateModeMenuItem.DropDownItems.Add(menuItemModeOff);
+        updateModeMenuItem.DropDownItems.Add(menuItemModeGlobal);
         updateTimeMenuItem.DropDownItems.Add(menuInterval1);
         updateTimeMenuItem.DropDownItems.Add(menuInterval2);
         updateTimeMenuItem.DropDownItems.Add(menuInterval3);
@@ -796,22 +819,15 @@ class ResidentTest : Form
         SetIcon(ICON_GREEN);
         Trace.WriteLine("再開しました");
     }
-    private void ChangeAlwaysIMEModeAndSave(String mode)
+    private void ChangeAlwaysIMEModeAndSave(int mode)
     {
         // App.config の更新
         Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
-        config.AppSettings.Settings["AlwaysIMEMode"].Value = mode;
+        config.AppSettings.Settings["AlwaysIMEMode"].Value = mode.ToString();
         config.Save(ConfigurationSaveMode.Modified);
         ConfigurationManager.RefreshSection("appSettings");
 
-        if (mode.CompareTo("off") == 0)
-        {
-            ImeModeGlobal = true;
-        }
-        else
-        {
-            ImeModeGlobal = false;
-        }
+        ImeModeGlobal = mode;
     }
     private void ChangeIntervalAndSave(int interval)
     {
@@ -1189,7 +1205,7 @@ class ResidentTest : Form
         }
         if (foregroundWindowTitle != previousWindowTitle)
         {
-            if (ImeModeGlobal)
+            if (ImeModeGlobal == IMEMODE_GLOBAL)
             {
                 if (CheckforegroundprocessName(ImeOffArray))
                 {
@@ -1204,7 +1220,7 @@ class ResidentTest : Form
                     SetImeGlobal();
                 }
             }
-            if (!ImeModeGlobal)
+            if (ImeModeGlobal == IMEMODE_ON)
             {
                 if (CheckforegroundprocessName(ImeOffArray))
                 {
@@ -1217,6 +1233,21 @@ class ResidentTest : Form
                 else
                 {
                     SetImePreset();
+                }
+            }
+            if (ImeModeGlobal == IMEMODE_OFF)
+            {
+                if (CheckforegroundprocessName(ImeOffArray))
+                {
+                    SetImePreset();
+                }
+                else if (CheckforegroundWindowTitleRegex(ImeOffTitleArray))
+                {
+                    SetImePreset();
+                }
+                else
+                {
+                    SetImeOffList();
                 }
             }
             // タスクバーをクリックするとタイトルが空欄のexplorerがヒット
