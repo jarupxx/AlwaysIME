@@ -15,19 +15,63 @@ using System.Text.RegularExpressions;
 
 class MainWindow
 {
+    static Mutex mutex;
+    static FileSystemWatcher watcher;
+    static string restartSignalFile = Path.Combine(Path.GetTempPath(), "AlwaysIME_restart_signal");
+
+    [STAThread]
     static void Main()
     {
         bool createdNew;
-        Mutex mutex = new Mutex(true, "AlwaysIME", out createdNew);
+        mutex = new Mutex(true, "AlwaysIME", out createdNew);
 
         if (createdNew)
         {
             ApplicationConfiguration.Initialize();
             ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
+            WatchForRestartSignal();
             Application.Run();
             mutex.ReleaseMutex();
         }
+        else
+        {
+            // すでに起動しているインスタンスがある場合は、再起動シグナルを送信
+            File.Create(restartSignalFile).Close();
+        }
+    }
+
+    static void WatchForRestartSignal()
+    {
+        watcher = new FileSystemWatcher
+        {
+            Path = Path.GetDirectoryName(restartSignalFile),
+            Filter = Path.GetFileName(restartSignalFile),
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime
+        };
+
+        watcher.Created += OnRestartSignalReceived;
+        watcher.EnableRaisingEvents = true;
+    }
+
+    static void OnRestartSignalReceived(object sender, FileSystemEventArgs e)
+    {
+        // シグナルファイルを削除
+        if (File.Exists(restartSignalFile))
+        {
+            File.Delete(restartSignalFile);
+        }
+
+        RestartApplication();
+    }
+
+    static void RestartApplication()
+    {
+        string exePath = Process.GetCurrentProcess().MainModule.FileName;
+        Process.Start(exePath);
+
+        // 現在のプロセスを終了
+        Environment.Exit(0);
     }
 }
 
