@@ -4,6 +4,8 @@
 
 AlwaysIME.dll.config を参考に設定してください。
 
+「設定の再読み込み」または、AlwaysIME.exeを多重起動で反映されます。
+
 - AlwaysIMEMode
 
   IMEの制御方法を指定します。
