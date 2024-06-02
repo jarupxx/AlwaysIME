@@ -657,52 +657,52 @@ class ResidentTest : Form
 
         private void InitializeDialogComponents()
         {
-            float Zoom;
+            float UIScale;
             using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
-                Zoom = graphics.DpiX / 96;
-            this.Font = new Font("Meiryo", (int)(9 * Math.Pow(Zoom, 1.0 / 3.0)), FontStyle.Regular);
+                UIScale = graphics.DpiX / 96;
+            this.Font = new Font("Meiryo", (int)(9 * Math.Pow(UIScale, 1.0 / 3.0)), FontStyle.Regular);
             this.Text = "IMEオフに登録";
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Size = new Size((int)(440 * Zoom), (int)(200 * Zoom));
+            this.Size = new Size((int)(440 * UIScale), (int)(200 * UIScale));
 
             titleLabel = new Label();
             titleLabel.Text = "タイトル:";
-            titleLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
-            titleLabel.Location = new Point((int)(20 * Zoom), (int)(20 * Zoom));
+            titleLabel.Size = new Size((int)(80 * UIScale), (int)(20 * UIScale));
+            titleLabel.Location = new Point((int)(20 * UIScale), (int)(20 * UIScale));
             titleTextBox = new TextBox();
-            titleTextBox.Location = new Point((int)(100 * Zoom), (int)(20 * Zoom));
-            titleTextBox.Size = new Size((int)(300 * Zoom), (int)(20 * Zoom));
+            titleTextBox.Location = new Point((int)(100 * UIScale), (int)(20 * UIScale));
+            titleTextBox.Size = new Size((int)(300 * UIScale), (int)(20 * UIScale));
             titleTextBox.Text = RegistrationWindowTitle;
             appLabel = new Label();
             appLabel.Text = "アプリ名:";
-            appLabel.Size = new Size((int)(80 * Zoom), (int)(20 * Zoom));
-            appLabel.Location = new Point((int)(20 * Zoom), (int)(50 * Zoom));
+            appLabel.Size = new Size((int)(80 * UIScale), (int)(20 * UIScale));
+            appLabel.Location = new Point((int)(20 * UIScale), (int)(50 * UIScale));
             appTextBox = new TextBox();
-            appTextBox.Location = new Point((int)(100 * Zoom), (int)(50 * Zoom));
-            appTextBox.Size = new Size((int)(300 * Zoom), (int)(20 * Zoom));
+            appTextBox.Location = new Point((int)(100 * UIScale), (int)(50 * UIScale));
+            appTextBox.Size = new Size((int)(300 * UIScale), (int)(20 * UIScale));
             appTextBox.Text = RegistrationprocessName;
             titleRadioButton = new RadioButton();
             titleRadioButton.Text = "タイトル";
-            titleRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
-            titleRadioButton.Location = new Point((int)(100 * Zoom), (int)(80 * Zoom));
+            titleRadioButton.Size = new Size((int)(90 * UIScale), (int)(30 * UIScale));
+            titleRadioButton.Location = new Point((int)(100 * UIScale), (int)(80 * UIScale));
             appRadioButton = new RadioButton();
             appRadioButton.Text = "アプリ名";
-            appRadioButton.Size = new Size((int)(90 * Zoom), (int)(30 * Zoom));
-            appRadioButton.Location = new Point((int)(220 * Zoom), (int)(80 * Zoom));
+            appRadioButton.Size = new Size((int)(90 * UIScale), (int)(30 * UIScale));
+            appRadioButton.Location = new Point((int)(220 * UIScale), (int)(80 * UIScale));
             appRadioButton.Checked = true;
             okButton = new Button();
             okButton.Text = "登録(&R)";
-            okButton.Size = new Size((int)(110 * Zoom), (int)(32 * Zoom));
+            okButton.Size = new Size((int)(110 * UIScale), (int)(32 * UIScale));
             okButton.DialogResult = DialogResult.OK;
-            okButton.Location = new Point((int)(100 * Zoom), (int)(110 * Zoom));
+            okButton.Location = new Point((int)(100 * UIScale), (int)(110 * UIScale));
             okButton.Click += OkButton_Click;
             cancelButton = new Button();
             cancelButton.Text = "キャンセル(&C)";
-            cancelButton.Size = new Size((int)(110 * Zoom), (int)(32 * Zoom));
+            cancelButton.Size = new Size((int)(110 * UIScale), (int)(32 * UIScale));
             cancelButton.DialogResult = DialogResult.Cancel;
-            cancelButton.Location = new System.Drawing.Point((int)(220 * Zoom), (int)(110 * Zoom));
+            cancelButton.Location = new System.Drawing.Point((int)(220 * UIScale), (int)(110 * UIScale));
 
             if (darkModeEnabled)
             {
