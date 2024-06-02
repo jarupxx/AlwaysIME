@@ -79,7 +79,7 @@ class MainWindow
     {
         string exePath = AppDomain.CurrentDomain.BaseDirectory;
         string configFilePath = Path.Combine(exePath, "AlwaysIME.dll.config");
-        string backupFilePath = Path.Combine(exePath, "AlwaysIME.dll.config.bak");
+        string backupFilePath = Path.Combine(exePath, "~AlwaysIME.dll.config.bak");
 
         if (File.Exists(configFilePath))
         {
