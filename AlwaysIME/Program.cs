@@ -28,6 +28,7 @@ class MainWindow
         if (createdNew)
         {
             ApplicationConfiguration.Initialize();
+            BackupConfigFile();
             ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
             WatchForRestartSignal();
@@ -72,6 +73,43 @@ class MainWindow
 
         // 現在のプロセスを終了
         Environment.Exit(0);
+    }
+
+    static void BackupConfigFile()
+    {
+        string exePath = AppDomain.CurrentDomain.BaseDirectory;
+        string configFilePath = Path.Combine(exePath, "AlwaysIME.dll.config");
+        string backupFilePath = Path.Combine(exePath, "AlwaysIME.dll.config.bak");
+
+        if (File.Exists(configFilePath))
+        {
+            DateTime configLastWriteTime = File.GetLastWriteTime(configFilePath);
+
+            if (File.Exists(backupFilePath))
+            {
+                DateTime backupLastWriteTime = File.GetLastWriteTime(backupFilePath);
+
+                if ((DateTime.Now - configLastWriteTime).TotalDays >= 2)
+                {
+                    File.Copy(configFilePath, backupFilePath, true);
+                    Debug.WriteLine("2日経過したのでバックアップを作成しました。");
+                }
+                else
+                {
+                    Debug.WriteLine("今日のバックアップは済んでいます。");
+                }
+            }
+            else
+            {
+                // app.config.bakが存在しない場合、新しく作成
+                File.Copy(configFilePath, backupFilePath, true);
+                Debug.WriteLine("新しくバックアップを作成しました。");
+            }
+        }
+        else
+        {
+            Trace.WriteLine("AlwaysIME.dll.configが見つかりません。");
+        }
     }
 }
 
