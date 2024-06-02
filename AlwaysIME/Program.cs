@@ -15,19 +15,63 @@ using System.Text.RegularExpressions;
 
 class MainWindow
 {
+    static Mutex mutex;
+    static FileSystemWatcher watcher;
+    static string restartSignalFile = Path.Combine(Path.GetTempPath(), "AlwaysIME_restart_signal");
+
+    [STAThread]
     static void Main()
     {
         bool createdNew;
-        Mutex mutex = new Mutex(true, "AlwaysIME", out createdNew);
+        mutex = new Mutex(true, "AlwaysIME", out createdNew);
 
         if (createdNew)
         {
             ApplicationConfiguration.Initialize();
             ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
+            WatchForRestartSignal();
             Application.Run();
             mutex.ReleaseMutex();
         }
+        else
+        {
+            // すでに起動しているインスタンスがある場合は、再起動シグナルを送信
+            File.Create(restartSignalFile).Close();
+        }
+    }
+
+    static void WatchForRestartSignal()
+    {
+        watcher = new FileSystemWatcher
+        {
+            Path = Path.GetDirectoryName(restartSignalFile),
+            Filter = Path.GetFileName(restartSignalFile),
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime
+        };
+
+        watcher.Created += OnRestartSignalReceived;
+        watcher.EnableRaisingEvents = true;
+    }
+
+    static void OnRestartSignalReceived(object sender, FileSystemEventArgs e)
+    {
+        // シグナルファイルを削除
+        if (File.Exists(restartSignalFile))
+        {
+            File.Delete(restartSignalFile);
+        }
+
+        RestartApplication();
+    }
+
+    static void RestartApplication()
+    {
+        string exePath = Process.GetCurrentProcess().MainModule.FileName;
+        Process.Start(exePath);
+
+        // 現在のプロセスを終了
+        Environment.Exit(0);
     }
 }
 
@@ -478,6 +522,10 @@ class ResidentTest : Form
         MenuItemRegistrationDialog.Text = "IMEオフに登録";
         MenuItemRegistrationDialog.Click += MenuItemRegistrationDialog_Click;
 
+        ToolStripMenuItem MenuItemReload = new ToolStripMenuItem();
+        MenuItemReload.Text = "設定の再読み込み";
+        MenuItemReload.Click += MenuReload_Click;
+
         ToolStripSeparator separator4 = new ToolStripSeparator();
 
         menuPunctuation = new ToolStripMenuItem();
@@ -531,6 +579,8 @@ class ResidentTest : Form
             separator3.ForeColor = Color.White;
             MenuItemRegistrationDialog.BackColor = Color.FromArgb(32, 32, 32);
             MenuItemRegistrationDialog.ForeColor = Color.White;
+            MenuItemReload.BackColor = Color.FromArgb(32, 32, 32);
+            MenuItemReload.ForeColor = Color.White;
             separator4.BackColor = Color.FromArgb(32, 32, 32);
             separator4.ForeColor = Color.White;
             menuPunctuation.BackColor = Color.FromArgb(32, 32, 32);
@@ -568,6 +618,7 @@ class ResidentTest : Form
         if (!darkModeEnabled)
             menu.Items.Add(separator3);
         menu.Items.Add(MenuItemRegistrationDialog);
+        menu.Items.Add(MenuItemReload);
         if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
         {
             if (!darkModeEnabled)
@@ -713,6 +764,39 @@ class ResidentTest : Form
         using (var dialog = new DialogForm())
         {
             dialog.ShowDialog();
+        }
+    }
+    private void MenuReload_Click(object sender, EventArgs e)
+    {
+        var map = new ExeConfigurationFileMap { ExeConfigFilename = "AlwaysIME.dll.config" };
+        string configFilePath = ConfigurationManager.OpenMappedExeConfiguration(map, ConfigurationUserLevel.None).FilePath;
+        try
+        {
+            // app.configを既定のアプリケーションで開く
+            Process editorProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = configFilePath,
+                UseShellExecute = true
+            });
+
+            if (editorProcess != null)
+            {
+                // プロセスの終了を待機する
+                editorProcess.WaitForExit();
+
+                // appSettingsセクションを再読み込み
+                ConfigurationManager.RefreshSection("appSettings");
+                InitializeAppConfig();
+                menuPunctuation.Text = "「" + PunctuationText[(val[ConfigPunctuation][1] >> 16) & 0x3] + "」に切替(&P)";
+                menuSpace.Text = SpaceWidthText[val[ConfigSpaceWidth][1]] + "スペースに切替(&S)";
+                this.timer.Interval = imeInterval;
+                // メニュー - 終了の位置も再起動後に有効
+                MessageBox.Show("設定を反映しました。\n※ダークモードは再起動後に有効。", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("設定の再読み込みに失敗しました: " + ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
     private void Punctuation_Click(object sender, EventArgs e)
