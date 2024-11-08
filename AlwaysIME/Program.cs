@@ -453,6 +453,21 @@ class ResidentTest : Form
                 }
             }
             SetPunctuationMode = val[ConfigPunctuation][0];
+            if (val[ConfigPunctuation][0] == 0 && val[ConfigPunctuation][1] == 0)
+            {
+                /* Nothing to do */
+            }
+            else
+            {
+                if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], SetPunctuationMode, valueType[ConfigPunctuation]))
+                {
+                    Debug.WriteLine($"句読点の初期化をしました");
+                }
+                else
+                {
+                    Trace.WriteLine("Failed to write registory.");
+                }
+            }
         }
         buff = ConfigurationManager.AppSettings["SpaceWidth"];
         if (!string.IsNullOrEmpty(buff))
@@ -472,6 +487,21 @@ class ResidentTest : Form
                 }
             }
             SetSpaceMode = val[ConfigSpaceWidth][0];
+            if (val[ConfigSpaceWidth][0] == 0 && val[ConfigSpaceWidth][1] == 0)
+            {
+                /* Nothing to do */
+            }
+            else
+            {
+                if (WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigSpaceWidth], valueName[ConfigSpaceWidth], SetSpaceMode, valueType[ConfigSpaceWidth]))
+                {
+                    Debug.WriteLine($"スペースの初期化をしました");
+                }
+                else
+                {
+                    Trace.WriteLine("Failed to write registory.");
+                }
+            }
         }
         buff = ConfigurationManager.AppSettings["AppExitEnd"];
         if (!string.IsNullOrEmpty(buff))
