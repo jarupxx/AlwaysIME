@@ -85,11 +85,23 @@ class MainWindow
         {
             DateTime configLastWriteTime = File.GetLastWriteTime(configFilePath);
 
-            if (File.Exists(backupFilePath))
+            if (!File.Exists(backupFilePath))
+            {
+                // app.config.bakが存在しない場合、新しく作成
+                File.Copy(configFilePath, backupFilePath, true);
+                Debug.WriteLine("新しくバックアップを作成しました。");
+            }
+            else
             {
                 DateTime backupLastWriteTime = File.GetLastWriteTime(backupFilePath);
 
-                if ((DateTime.Now - configLastWriteTime).TotalDays >= 2)
+                // 設定よりバックアップが新しい場合は起動しない
+                if (backupLastWriteTime > configLastWriteTime)
+                {
+                    MessageBox.Show($"設定ファイルとバックアップを確認してください。\n\n場所: {exePath}\n\"AlwaysIME.dll.config\"\t日時: {configLastWriteTime:yyyy/MM/dd HH:mm:ss}\n\"~AlwaysIME.dll.config.bak\"\t日時: {backupLastWriteTime:yyyy/MM/dd HH:mm:ss}", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    Environment.Exit(0);
+                }
+                else if ((DateTime.Now - configLastWriteTime).TotalDays >= 2)
                 {
                     File.Copy(configFilePath, backupFilePath, true);
                     Debug.WriteLine("2日経過したのでバックアップを作成しました。");
@@ -98,12 +110,6 @@ class MainWindow
                 {
                     Debug.WriteLine("今日のバックアップは済んでいます。");
                 }
-            }
-            else
-            {
-                // app.config.bakが存在しない場合、新しく作成
-                File.Copy(configFilePath, backupFilePath, true);
-                Debug.WriteLine("新しくバックアップを作成しました。");
             }
         }
         else
