@@ -38,4 +38,4 @@ Windows 10/11
 
 https://dotnet.microsoft.com/ja-jp/download
 
-Windows x64 Installer [直接リンク](https://download.visualstudio.microsoft.com/download/pr/e91876a9-1760-42cb-a6f4-97c57e9cca52/b433fcf4768929539f17e1908cb315bf/aspnetcore-runtime-8.0.3-win-x64.exe)
+Windows x64 Installer [直接リンク](https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.17/dotnet-runtime-8.0.17-win-x64.exe)
