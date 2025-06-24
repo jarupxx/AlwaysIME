@@ -148,12 +148,13 @@ class ResidentTest : Form
     static string foregroundprocessName;
     private static string foregroundWindowTitle;
     static string RegistrationWindowTitle;
-    static readonly string[][] List = new string[5][];
+    static readonly string[][] List = new string[6][];
     const int PassArray = 0;
     const int ImeOffArray = 1;
     const int ImeOffTitleArray = 2;
-    const int OnActivatedAppArray = 3;
-    const int BackgroundArray = 4;
+    const int RemoveUpdateTagArray = 3;
+    const int OnActivatedAppArray = 4;
+    const int BackgroundArray = 5;
     private static string RunOnActivatedAppPath;
     private static string RunOnActivatedArgv;
     private static string RunBackgroundAppPath;
@@ -361,6 +362,11 @@ class ResidentTest : Form
         if (!string.IsNullOrEmpty(buff))
         {
             List[ImeOffTitleArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+        }
+        buff = ConfigurationManager.AppSettings["UpdateTag"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            List[RemoveUpdateTagArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
         }
         buff = ConfigurationManager.AppSettings["intervalTime"];
         if (!string.IsNullOrEmpty(buff))
@@ -1072,6 +1078,42 @@ class ResidentTest : Form
         }
         return false;
     }
+    private bool CheckRemoveUpdateTagRegex(int param)
+    {
+        string RegexforegroundWindowTitle = foregroundWindowTitle;
+        if (List[param] != null)
+        {
+            if (!string.IsNullOrEmpty(foregroundWindowTitle))
+            {
+                for (int i = 0; i < List[param].Length; i++)
+                {
+                    RegexforegroundWindowTitle = Regex.Replace(RegexforegroundWindowTitle, List[RemoveUpdateTagArray][i], "").Trim();
+                }
+                if (RegexforegroundWindowTitle != foregroundWindowTitle)
+                {
+                    Debug.WriteLine($"foregroundWindowTitle:{foregroundWindowTitle}");
+                    Debug.WriteLine($"previousWindowTitle--:{previousWindowTitle}");
+                    Debug.WriteLine($"RegexWindowTitle-----:{RegexforegroundWindowTitle}");
+                    Debug.WriteLine($"CheckRemoveUpdateTagRegex:{(previousWindowTitle == RegexforegroundWindowTitle ? "成功" : "失敗")}");
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    private void RemoveUpdateTagRegex()
+    {
+        if (List[RemoveUpdateTagArray] != null)
+        {
+            if (!string.IsNullOrEmpty(foregroundWindowTitle))
+            {
+                for (int i = 0; i < List[RemoveUpdateTagArray].Length; i++)
+                {
+                    foregroundWindowTitle = Regex.Replace(foregroundWindowTitle, List[RemoveUpdateTagArray][i], "").Trim();
+                }
+            }
+        }
+    }
     private void CheckLastKeyInput()
     {
         LASTINPUTINFO lastInputInfo = new LASTINPUTINFO();
@@ -1300,6 +1342,11 @@ class ResidentTest : Form
                         if (GetWindowText(foregroundWindowHandle, titleBuilder, titleBuilder.Capacity) > 0)
                         {
                             foregroundWindowTitle = titleBuilder.ToString();
+                            if (CheckRemoveUpdateTagRegex(RemoveUpdateTagArray))
+                            {
+                                RemoveUpdateTagRegex();
+                                Debug.WriteLine($"タイトルから更新タグを削除しました。");
+                            }
                             Debug.WriteLine($"タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
                         }
                         else
@@ -1430,7 +1477,10 @@ class ResidentTest : Form
                 case CModeMS_HankakuKana: /* through */
                 case CModeMS_ZenkakuEisu: /* through */
                 case CModeMS_ZenkakuKana:
-                    SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETCONVERSIONMODE, (IntPtr)CMode_Hiragana); // ひらがなモードに設定
+                    IntPtr result = SendMessage(imwd, WM_IME_CONTROL, (IntPtr)IMC_SETCONVERSIONMODE, (IntPtr)CMode_Hiragana); // ひらがなモードに設定
+                    int error = Marshal.GetLastWin32Error();
+                    Console.WriteLine("SendMessage result: " + result.ToInt64());
+                    Console.WriteLine("Last Win32 Error: " + error);
                     break;
                 default:
                     Debug.WriteLine($"不明な status code:{imeConvMode}");
