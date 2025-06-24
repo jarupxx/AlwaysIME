@@ -528,24 +528,29 @@ class ResidentTest : Form
     }
     private void Close_Click(object sender, EventArgs e)
     {
-        if (ScheduleRunBackgroundApp)
+        DialogResult result = MessageBox.Show("AlwaysIME を終了します。", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+        if (result == DialogResult.Yes)
         {
-            delayRunBackgroundApp = 1;
-            RunBackgroundApp();
+            if (ScheduleRunBackgroundApp)
+            {
+                delayRunBackgroundApp = 1;
+                RunBackgroundApp();
+            }
+            if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
+            {
+                SetPunctuationMode = val[ConfigPunctuation][1];
+                Punctuation_Click(this, e);
+            }
+            if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+            {
+                SetSpaceMode = val[ConfigSpaceWidth][1];
+                Space_Click(this, e);
+            }
+            icon.Visible = false;
+            icon.Dispose();
+            Application.Exit();
         }
-        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
-        {
-            SetPunctuationMode = val[ConfigPunctuation][1];
-            Punctuation_Click(this, e);
-        }
-        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
-        {
-            SetSpaceMode = val[ConfigSpaceWidth][1];
-            Space_Click(this, e);
-        }
-        icon.Visible = false;
-        icon.Dispose();
-        Application.Exit();
     }
     private void setComponents()
     {
