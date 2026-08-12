@@ -322,17 +322,14 @@ class ResidentTest : Form
             {
                 ImeModeGlobal = IMEMODE_ON;
             }
+            else if (int.TryParse(buff, out int parsedImeMode) && parsedImeMode >= 1 && parsedImeMode <= 3)
+            {
+                ImeModeGlobal = parsedImeMode;
+            }
             else
             {
-                if (int.Parse(buff) >= 1 && int.Parse(buff) <= 3)
-                {
-                    ImeModeGlobal = int.Parse(buff);
-                }
-                else
-                {
-                    MessageBox.Show("AlwaysIMEModeの設定が間違っています");
-                    ImeModeGlobal = IMEMODE_ON;
-                }
+                MessageBox.Show("AlwaysIMEModeの設定が間違っています");
+                ImeModeGlobal = IMEMODE_ON;
             }
         }
         else
@@ -378,27 +375,62 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["intervalTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            imeInterval = int.Parse(buff);
+            if (int.TryParse(buff, out int parsedIntervalTime))
+            {
+                imeInterval = parsedIntervalTime;
+            }
+            else
+            {
+                MessageBox.Show("intervalTimeの設定が間違っています");
+            }
         }
         buff = ConfigurationManager.AppSettings["SuspendFewTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            SuspendFewInterval = int.Parse(buff);
+            if (int.TryParse(buff, out int parsedSuspendFewTime))
+            {
+                SuspendFewInterval = parsedSuspendFewTime;
+            }
+            else
+            {
+                MessageBox.Show("SuspendFewTimeの設定が間違っています");
+            }
         }
         buff = ConfigurationManager.AppSettings["SuspendTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            SuspendInterval = int.Parse(buff);
+            if (int.TryParse(buff, out int parsedSuspendTime))
+            {
+                SuspendInterval = parsedSuspendTime;
+            }
+            else
+            {
+                MessageBox.Show("SuspendTimeの設定が間違っています");
+            }
         }
         buff = ConfigurationManager.AppSettings["NoKeyInputTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            noKeyInputInterval = (int)(float.Parse(buff) * 60 * 1000);
+            if (float.TryParse(buff, out float parsedNoKeyInputTime))
+            {
+                noKeyInputInterval = (int)(parsedNoKeyInputTime * 60 * 1000);
+            }
+            else
+            {
+                MessageBox.Show("NoKeyInputTimeの設定が間違っています");
+            }
         }
         buff = ConfigurationManager.AppSettings["DelayBackgroundTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            DelayBackgroundInterval = (int)(float.Parse(buff) * 60 * 1000 / imeInterval);
+            if (float.TryParse(buff, out float parsedDelayBackgroundTime))
+            {
+                DelayBackgroundInterval = (int)(parsedDelayBackgroundTime * 60 * 1000 / imeInterval);
+            }
+            else
+            {
+                MessageBox.Show("DelayBackgroundTimeの設定が間違っています");
+            }
         }
         buff = ConfigurationManager.AppSettings["OnActivatedAppList"];
         if (!string.IsNullOrEmpty(buff))
@@ -461,9 +493,9 @@ class ResidentTest : Form
             val[ConfigPunctuation] = new int[2];
             for (int i = 0; i < parts.Length; i++)
             {
-                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 3)
+                if (int.TryParse(parts[i], out int parsedPunctuation) && parsedPunctuation >= 0 && parsedPunctuation <= 3)
                 {
-                    val[ConfigPunctuation][i] = temp | int.Parse(parts[i]) << 16;
+                    val[ConfigPunctuation][i] = temp | parsedPunctuation << 16;
                 }
                 else
                 {
@@ -495,9 +527,9 @@ class ResidentTest : Form
             val[ConfigSpaceWidth] = new int[2];
             for (int i = 0; i < parts.Length; i++)
             {
-                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 2)
+                if (int.TryParse(parts[i], out int parsedSpaceWidth) && parsedSpaceWidth >= 0 && parsedSpaceWidth <= 2)
                 {
-                    val[ConfigSpaceWidth][i] = int.Parse(parts[i]);
+                    val[ConfigSpaceWidth][i] = parsedSpaceWidth;
                 }
                 else
                 {
@@ -525,12 +557,13 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["AppExitEnd"];
         if (!string.IsNullOrEmpty(buff))
         {
-            if (int.Parse(buff) == 1)
+            if (int.TryParse(buff, out int parsedAppExitEnd))
             {
-                AppExitEndEnabled = true;
+                AppExitEndEnabled = parsedAppExitEnd == 1;
             }
-            else/* if (int.Parse(buff) == 0)*/
+            else
             {
+                MessageBox.Show("AppExitEndの設定が間違っています");
                 AppExitEndEnabled = false;
             }
         }
