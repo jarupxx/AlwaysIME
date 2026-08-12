@@ -16,8 +16,9 @@ using System.Text.RegularExpressions;
 class MainWindow
 {
     static Mutex mutex;
-    static FileSystemWatcher watcher;
-    static string restartSignalFile = Path.Combine(Path.GetTempPath(), "AlwaysIME_restart_signal");
+    static EventWaitHandle restartSignalEvent;
+    const string RestartSignalEventName = "AlwaysIME_RestartSignal";
+    static RegisteredWaitHandle restartSignalRegisteredWait;
 
     [STAThread]
     static void Main()
@@ -33,36 +34,42 @@ class MainWindow
             ResidentTest rm = new ResidentTest();
             WatchForRestartSignal();
             Application.Run();
+            restartSignalRegisteredWait?.Unregister(null);
+            restartSignalEvent?.Dispose();
             mutex.ReleaseMutex();
         }
         else
         {
             // すでに起動しているインスタンスがある場合は、再起動シグナルを送信
-            File.Create(restartSignalFile).Close();
+            try
+            {
+                using EventWaitHandle signalEvent = EventWaitHandle.OpenExisting(RestartSignalEventName);
+                signalEvent.Set();
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+                // 既存インスタンスがまだイベントを作成していない場合は何もできない
+                Trace.WriteLine("再起動シグナル用イベントが見つかりません。");
+            }
         }
     }
 
     static void WatchForRestartSignal()
     {
-        watcher = new FileSystemWatcher
-        {
-            Path = Path.GetDirectoryName(restartSignalFile),
-            Filter = Path.GetFileName(restartSignalFile),
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime
-        };
+        // AutoReset: Set()を受け取ったら自動的に非シグナル状態に戻る
+        restartSignalEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RestartSignalEventName);
 
-        watcher.Created += OnRestartSignalReceived;
-        watcher.EnableRaisingEvents = true;
+        // イベントがシグナルされたらスレッドプールのスレッドでコールバックを実行する
+        restartSignalRegisteredWait = ThreadPool.RegisterWaitForSingleObject(
+            restartSignalEvent,
+            (state, timedOut) => OnRestartSignalReceived(),
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
     }
 
-    static void OnRestartSignalReceived(object sender, FileSystemEventArgs e)
+    static void OnRestartSignalReceived()
     {
-        // シグナルファイルを削除
-        if (File.Exists(restartSignalFile))
-        {
-            File.Delete(restartSignalFile);
-        }
-
         RestartApplication();
     }
 
