@@ -134,6 +134,9 @@ class ResidentTest : Form
     private int iconsize;
     private ToolStripMenuItem menuPunctuation;
     private ToolStripMenuItem menuSpace;
+    private ToolStripSeparator separatorPunct;
+    private ToolStripSeparator separatorSpace;
+    private static ResidentTest currentInstance;
     const int ICON_RED = 0;
     const int ICON_GREEN = 1;
     const int ICON_GRAY = 2;
@@ -256,6 +259,11 @@ class ResidentTest : Form
     const int ConfigSpaceWidth = 1;
     static int SetPunctuationMode;
     static int SetSpaceMode;
+    // MS-IME入力設定(レジストリ)
+    const string MsImeRegistryPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
+    // 変換/無変換キーへのIMEオン・オフ割り当て: 変更前の値を保持して終了時に復元する
+    static bool keyAssignmentRecorded = false;
+    static int origKeyAssignment = -1; // -1 = 元々値が存在しなかった
     static readonly string[] keyPath = new string[2];
     static readonly string[] valueName = new string[2];
     static readonly RegistryValueKind[] valueType = new RegistryValueKind[2];
@@ -287,6 +295,7 @@ class ResidentTest : Form
     public ResidentTest()
     {
         this.ShowInTaskbar = false;
+        currentInstance = this;
         this.setComponents();
         this.timer = new System.Windows.Forms.Timer();
         this.timer.Interval = imeInterval;
@@ -307,6 +316,8 @@ class ResidentTest : Form
         { "Punctuation", "0,0" },
         { "SpaceWidth", "0,0" },
         { "AppExitEnd", "1" },
+        { "MsImeSwitch", "0" },
+        { "KeyAssignment", "" },
     };
 
     // 設定値が不正な場合に確認ダイアログを表示する。
@@ -666,8 +677,18 @@ class ResidentTest : Form
         {
             FWBackgroundArgv = buff;
         }
+        // MS-IME入力設定(スペース/句読点切替)の有効/無効
+        // 設定画面で明示的に無効("0")にした場合のみ、レジストリへの書き込みと切替を行わない。
+        // 未設定の場合は従来どおり Punctuation / SpaceWidth の設定値で動作する。
+        string msImeSwitchBuff = ConfigurationManager.AppSettings["MsImeSwitch"];
+        if (!string.IsNullOrEmpty(msImeSwitchBuff) && msImeSwitchBuff != "0" && msImeSwitchBuff != "1")
+        {
+            HandleInvalidConfigValue("MsImeSwitch");
+            msImeSwitchBuff = "0";
+        }
+        bool msImeSwitchActive = msImeSwitchBuff != "0";
         buff = ConfigurationManager.AppSettings["Punctuation"];
-        if (!string.IsNullOrEmpty(buff))
+        if (!string.IsNullOrEmpty(buff) && msImeSwitchActive)
         {
             int temp = 0x7FFCFFFF & (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], valueType[ConfigPunctuation]);
             string[] parts = buff.Split(',');
@@ -702,7 +723,7 @@ class ResidentTest : Form
             }
         }
         buff = ConfigurationManager.AppSettings["SpaceWidth"];
-        if (!string.IsNullOrEmpty(buff))
+        if (!string.IsNullOrEmpty(buff) && msImeSwitchActive)
         {
             string[] parts = buff.Split(',');
             val[ConfigSpaceWidth] = new int[2];
@@ -735,6 +756,23 @@ class ResidentTest : Form
                 }
             }
         }
+        buff = ConfigurationManager.AppSettings["KeyAssignment"];
+        if (!string.IsNullOrEmpty(buff))
+        {
+            if (int.TryParse(buff, out int parsedKeyAssignment) && (parsedKeyAssignment == 0 || parsedKeyAssignment == 1))
+            {
+                ApplyKeyAssignment(parsedKeyAssignment == 1);
+            }
+            else
+            {
+                HandleInvalidConfigValue("KeyAssignment");
+            }
+        }
+        else
+        {
+            // 管理対象外になった場合は元の設定に戻す
+            RestoreKeyAssignment();
+        }
         buff = ConfigurationManager.AppSettings["AppExitEnd"];
         if (!string.IsNullOrEmpty(buff))
         {
@@ -753,6 +791,122 @@ class ResidentTest : Form
             AppExitEndEnabled = true;
         }
     }
+    // ============================================================
+    // MS-IME入力設定
+    // ============================================================
+
+    // "初期値,切替先" 形式の設定値が、未設定("0,0"/空)以外になっているか
+    private static bool IsMsImePairConfigured(string buff)
+    {
+        if (string.IsNullOrWhiteSpace(buff))
+            return false;
+        return buff.Replace(" ", "") != "0,0";
+    }
+
+    // "初期値,切替先" 形式の設定値を解析する(各値は 0～max)
+    private static bool TryParseConfigPair(string buff, int max, out int init, out int target)
+    {
+        init = 0;
+        target = 0;
+        if (string.IsNullOrEmpty(buff))
+            return false;
+        string[] parts = buff.Split(',');
+        return parts.Length == 2
+            && int.TryParse(parts[0], out init) && init >= 0 && init <= max
+            && int.TryParse(parts[1], out target) && target >= 0 && target <= max;
+    }
+
+    // MS-IMEのレジストリ値(DWORD)を読み取る。読み取れない場合は null
+    private static int? ReadMsImeDword(string name)
+    {
+        try
+        {
+            object value = ReadRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, name, RegistryValueKind.DWord);
+            return value is int intValue ? intValue : null;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"ReadMsImeDword({name}) failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    // 変換キー→IME-ON / 無変換キー→IME-OFF の割り当てを有効化・無効化する
+    private static void ApplyKeyAssignment(bool enable)
+    {
+        if (!keyAssignmentRecorded)
+        {
+            origKeyAssignment = ReadMsImeDword("IsKeyAssignmentEnabled") ?? -1;
+            keyAssignmentRecorded = true;
+        }
+        bool ok;
+        if (enable)
+        {
+            ok = WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "IsKeyAssignmentEnabled", 1, RegistryValueKind.DWord);
+            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentHenkan", 0, RegistryValueKind.DWord);   // 変換キー → IME-ON
+            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentMuhenkan", 1, RegistryValueKind.DWord); // 無変換キー → IME-OFF
+        }
+        else
+        {
+            ok = WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "IsKeyAssignmentEnabled", 0, RegistryValueKind.DWord);
+        }
+        if (ok)
+        {
+            Debug.WriteLine($"キー割り当てを{(enable ? "有効" : "無効")}にしました");
+        }
+        else
+        {
+            Trace.WriteLine("Failed to write registory.");
+        }
+    }
+
+    // キー割り当てを変更前の値に戻す
+    private static void RestoreKeyAssignment()
+    {
+        if (!keyAssignmentRecorded)
+            return;
+        WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "IsKeyAssignmentEnabled", origKeyAssignment >= 0 ? origKeyAssignment : 0, RegistryValueKind.DWord);
+        keyAssignmentRecorded = false;
+    }
+
+    // スペース/句読点を初期値に戻す(切替が有効な場合のみ)
+    // 設定の再読み込み前に呼ぶことで、無効化・値変更時にレジストリが切替先のまま残らないようにする
+    private static void RestoreMsImeSwitchValues()
+    {
+        if (val[ConfigPunctuation] != null && val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
+        {
+            WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], val[ConfigPunctuation][0], valueType[ConfigPunctuation]);
+        }
+        if (val[ConfigSpaceWidth] != null && val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        {
+            WriteRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigSpaceWidth], valueName[ConfigSpaceWidth], val[ConfigSpaceWidth][0], valueType[ConfigSpaceWidth]);
+        }
+    }
+
+    // 保存したMS-IME入力設定をレジストリとトレイメニューへ反映する(設定画面の「適用」用)
+    private static void ApplyMsImeSettings()
+    {
+        RestoreMsImeSwitchValues();
+        InitializeAppConfig();
+        currentInstance?.UpdateMsImeMenu();
+    }
+
+    // トレイメニューの句読点/スペース切替項目の表示・文言を現在の設定に合わせる
+    private void UpdateMsImeMenu()
+    {
+        bool punctSwitch = val[ConfigPunctuation][0] != val[ConfigPunctuation][1];
+        bool spaceSwitch = val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1];
+        // クリックしたときに適用される値を表示する
+        int nextPunct = (SetPunctuationMode == val[ConfigPunctuation][0]) ? val[ConfigPunctuation][1] : val[ConfigPunctuation][0];
+        int nextSpace = (SetSpaceMode == val[ConfigSpaceWidth][0]) ? val[ConfigSpaceWidth][1] : val[ConfigSpaceWidth][0];
+        menuPunctuation.Text = "「" + PunctuationText[(nextPunct >> 16) & 0x3] + "」に切替(&P)";
+        menuSpace.Text = SpaceWidthText[nextSpace] + "スペースに切替(&S)";
+        menuPunctuation.Visible = punctSwitch;
+        separatorPunct.Visible = punctSwitch;
+        menuSpace.Visible = spaceSwitch;
+        separatorSpace.Visible = spaceSwitch;
+    }
+
     private void Close_Click(object sender, EventArgs e)
     {
         DialogResult result = MessageBox.Show("AlwaysIME を終了します。", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -774,6 +928,7 @@ class ResidentTest : Form
                 SetSpaceMode = val[ConfigSpaceWidth][1];
                 Space_Click(this, e);
             }
+            RestoreKeyAssignment();
             icon.Visible = false;
             icon.Dispose();
             Application.Exit();
@@ -824,6 +979,10 @@ class ResidentTest : Form
 
         ToolStripSeparator separator3 = new ToolStripSeparator();
 
+        ToolStripMenuItem MenuItemShowConfig = new ToolStripMenuItem();
+        MenuItemShowConfig.Text = "設定を表示(&C)";
+        MenuItemShowConfig.Click += MenuItemShowConfig_Click;
+
         ToolStripMenuItem MenuItemRegistrationDialog = new ToolStripMenuItem();
         MenuItemRegistrationDialog.Text = "IMEオフに登録";
         MenuItemRegistrationDialog.Click += MenuItemRegistrationDialog_Click;
@@ -833,6 +992,7 @@ class ResidentTest : Form
         MenuItemReload.Click += MenuReload_Click;
 
         ToolStripSeparator separator4 = new ToolStripSeparator();
+        separatorPunct = separator4;
 
         menuPunctuation = new ToolStripMenuItem();
         // menuPunctuation.Text = "句読点切替(&P)";
@@ -840,6 +1000,7 @@ class ResidentTest : Form
         menuPunctuation.Click += new EventHandler(Punctuation_Click);
 
         ToolStripSeparator separator5 = new ToolStripSeparator();
+        separatorSpace = separator5;
 
         menuSpace = new ToolStripMenuItem();
         // menuSpace.Text = "スペース切替(&S)";
@@ -883,6 +1044,8 @@ class ResidentTest : Form
             updateTimeMenuItem.ForeColor = Color.White;
             separator3.BackColor = Color.FromArgb(32, 32, 32);
             separator3.ForeColor = Color.White;
+            MenuItemShowConfig.BackColor = Color.FromArgb(32, 32, 32);
+            MenuItemShowConfig.ForeColor = Color.White;
             MenuItemRegistrationDialog.BackColor = Color.FromArgb(32, 32, 32);
             MenuItemRegistrationDialog.ForeColor = Color.White;
             MenuItemReload.BackColor = Color.FromArgb(32, 32, 32);
@@ -923,26 +1086,24 @@ class ResidentTest : Form
         menu.Items.Add(updateTimeMenuItem);
         if (!darkModeEnabled)
             menu.Items.Add(separator3);
+        menu.Items.Add(MenuItemShowConfig);
         menu.Items.Add(MenuItemRegistrationDialog);
         menu.Items.Add(MenuItemReload);
-        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
-        {
-            if (!darkModeEnabled)
-                menu.Items.Add(separator4);
-            menu.Items.Add(menuPunctuation);
-        }
-        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
-        {
-            if (!darkModeEnabled)
-                menu.Items.Add(separator5);
-            menu.Items.Add(menuSpace);
-        }
+        // 表示/非表示は UpdateMsImeMenu() で切り替える
+        // (設定画面から有効/無効を変更したときに再起動なしで反映するため)
+        if (!darkModeEnabled)
+            menu.Items.Add(separator4);
+        menu.Items.Add(menuPunctuation);
+        if (!darkModeEnabled)
+            menu.Items.Add(separator5);
+        menu.Items.Add(menuSpace);
         if (AppExitEndEnabled)
         {
             if (!darkModeEnabled)
                 menu.Items.Add(separator6);
             menu.Items.Add(menuItem);
         }
+        UpdateMsImeMenu();
         icon.ContextMenuStrip = menu;
     }
     public class DialogForm : Form
@@ -1072,6 +1233,610 @@ class ResidentTest : Form
             dialog.ShowDialog();
         }
     }
+    private void MenuItemShowConfig_Click(object sender, EventArgs e)
+    {
+        using (var configForm = new ConfigForm())
+        {
+            if (configForm.ShowDialog() == DialogResult.OK)
+            {
+                // 設定を保存した場合は再読み込みして即時反映する
+                ConfigurationManager.RefreshSection("appSettings");
+                InitializeAppConfig();
+                UpdateMsImeMenu();
+                this.timer.Interval = imeInterval;
+            }
+        }
+    }
+
+    // ============================================================
+    // 設定ウィンドウ
+    // カテゴリー一覧（左） + 選択カテゴリーの編集パネル（右）の
+    // 2ペイン構成。リスト系設定はその場で追加・編集・削除・並べ替えができる。
+    // ============================================================
+    public class ConfigForm : Form
+    {
+        private class ConfigCategory
+        {
+            public string AppSettingKey;   // App.configのキー名（"seconds"/"advanced"タイプではnull可）
+            public string Label;           // 左のカテゴリー一覧に表示する名前
+            public string Desc;            // 説明文
+            public string Type;            // "list" / "seconds" / "msime" / "advanced"
+            public int ListIndex = -1;     // "list"タイプの場合、List[] 配列のインデックス
+        }
+
+        private readonly ConfigCategory[] categories = new ConfigCategory[]
+        {
+            new ConfigCategory
+            {
+                AppSettingKey = "PassList",
+                Label = "制御しないアプリ",
+                Desc = "IMEを一切操作しないアプリです。\r\n実行ファイル名（拡張子なし）を1行1件で入力してください。\r\n例: AlwaysIME",
+                Type = "list",
+                ListIndex = PassArray,
+            },
+            new ConfigCategory
+            {
+                AppSettingKey = "ImeOffList",
+                Label = "IME-OFFアプリ",
+                Desc = "アプリの切り替えやウィンドウタイトルの変化時に、IMEをOFFにするアプリです。\r\n実行ファイル名（拡張子なし）を1行1件で入力してください。\r\n例: cmd, powershell",
+                Type = "list",
+                ListIndex = ImeOffArray,
+            },
+            new ConfigCategory
+            {
+                AppSettingKey = "ImeOffTitle",
+                Label = "IME-OFFタイトルパターン",
+                Desc = "ウィンドウタイトルにマッチしたら、IMEをOFFにする正規表現です。\r\n1行1パターン、全アプリ共通で適用されます。\r\n例: \\.cs$",
+                Type = "list",
+                ListIndex = ImeOffTitleArray,
+            },
+            new ConfigCategory
+            {
+                AppSettingKey = "UpdateTag",
+                Label = "タイトル除外タグ",
+                Desc = "ウィンドウタイトルの変化を判定する際に、無視する部分を表す正規表現です。\r\nマッチした部分を除去してから変化を判定します。\r\n例: \\(更新\\)",
+                Type = "list",
+                ListIndex = RemoveUpdateTagArray,
+            },
+            new ConfigCategory
+            {
+                AppSettingKey = "NoKeyInputTime",
+                Label = "未入力タイムアウト",
+                Desc = "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\r\n秒単位で入力してください。",
+                Type = "seconds",
+            },
+            new ConfigCategory
+            {
+                AppSettingKey = null,
+                Label = "MS-IME入力設定",
+                Desc = "MS-IMEのスペース・句読点をレジストリ経由で制御します。\r\n有効にするとトレイメニューから切替できます。\r\n終了時はレジストリを元の値に復元します。",
+                Type = "msime",
+            },
+            new ConfigCategory
+            {
+                AppSettingKey = null,
+                Label = "上級者向け設定",
+                Desc = "動作に詳しい方向けの設定です。\r\n通常は変更不要です。",
+                Type = "advanced",
+            },
+        };
+
+        // カテゴリーごとの作業用リスト（"list"タイプのみ使用）
+        private readonly Dictionary<int, List<string>> categoryItems = new Dictionary<int, List<string>>();
+        private int selectedCategoryIndex = 0;
+        private int editingIndex = -1; // -1 = 新規追加モード
+        private float uiScale = 1f;
+
+        // ---- コントロール ----
+        private ListBox catList;
+        private Label descLabel;
+
+        private ListBox itemList;
+        private Button btnEdit, btnDelete, btnUp, btnDown;
+        private Label valLabel;
+        private TextBox inputEdit;
+        private Button btnAddOK;
+
+        private Label secondsLabel;
+        private NumericUpDown secondsCtrl;
+
+        private CheckBox chkAppExitEnd;
+        private CheckBox chkDarkMode;
+        private Label advNote;
+
+        // MS-IME入力設定パネル
+        private static readonly string[] InputSpaceLabels = ["現在の入力モード", "常に全角", "常に半角"];
+        private static readonly string[] PunctuationLabels = ["「，．」", "「、。」", "「、．」", "「，。」"];
+        private CheckBox chkKeyAssign;
+        private CheckBox chkMsImeSwitch;
+        private ComboBox cmbSpaceInit, cmbSpaceTo, cmbPunctInit, cmbPunctTo;
+        private Control[] msimeControls;
+
+        private Button btnSave, btnApply, btnCancel;
+
+        public ConfigForm()
+        {
+            InitializeComponents();
+            LoadCurrentValues();
+            RenderCategory(0);
+        }
+
+        private void InitializeComponents()
+        {
+            using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
+                uiScale = g.DpiX / 96;
+
+            int W = (int)(640 * uiScale);
+            int H = (int)(430 * uiScale);
+            int LW = (int)(170 * uiScale);
+            int SP = (int)(8 * uiScale);
+
+            this.Text = "AlwaysIME 設定";
+            this.Font = new Font("Meiryo UI", 9);
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.ClientSize = new Size(W, H);
+
+            if (darkModeEnabled)
+            {
+                this.BackColor = Color.FromArgb(32, 32, 32);
+                this.ForeColor = Color.White;
+            }
+            else
+            {
+                this.BackColor = Color.FromArgb(240, 240, 240);
+            }
+
+            // ---- 左側：カテゴリー一覧 ----
+            catList = new ListBox();
+            catList.Location = new Point(SP, SP);
+            catList.Size = new Size(LW - SP * 2, H - SP * 2 - (int)(40 * uiScale));
+            catList.IntegralHeight = false;
+            foreach (var cat in categories)
+                catList.Items.Add(cat.Label);
+            catList.SelectedIndexChanged += CatList_SelectedIndexChanged;
+            this.Controls.Add(catList);
+
+            int RX = LW + SP;
+            int RW = W - RX - SP;
+
+            // ---- 右側：説明文 ----
+            descLabel = new Label();
+            descLabel.Location = new Point(RX, SP);
+            descLabel.Size = new Size(RW, (int)(56 * uiScale));
+            descLabel.AutoSize = false;
+            this.Controls.Add(descLabel);
+
+            int panelTop = SP + (int)(60 * uiScale);
+            int panelHeight = H - panelTop - (int)(48 * uiScale);
+
+            // ---- リスト編集パネル ----
+            int btnW = (int)(76 * uiScale);
+            itemList = new ListBox();
+            itemList.Location = new Point(RX, panelTop);
+            itemList.Size = new Size(RW - btnW - SP, panelHeight - (int)(32 * uiScale));
+            itemList.IntegralHeight = false;
+            itemList.DoubleClick += (s, e) => StartEdit();
+            this.Controls.Add(itemList);
+
+            int BX = RX + RW - btnW;
+            btnEdit = new Button { Text = "編集", Location = new Point(BX, panelTop), Size = new Size(btnW, (int)(24 * uiScale)) };
+            btnDelete = new Button { Text = "削除", Location = new Point(BX, panelTop + (int)(28 * uiScale)), Size = new Size(btnW, (int)(24 * uiScale)) };
+            btnUp = new Button { Text = "↑ 上へ", Location = new Point(BX, panelTop + (int)(60 * uiScale)), Size = new Size(btnW, (int)(24 * uiScale)) };
+            btnDown = new Button { Text = "↓ 下へ", Location = new Point(BX, panelTop + (int)(88 * uiScale)), Size = new Size(btnW, (int)(24 * uiScale)) };
+            btnEdit.Click += (s, e) => StartEdit();
+            btnDelete.Click += (s, e) => DeleteItem();
+            btnUp.Click += (s, e) => MoveItem(-1);
+            btnDown.Click += (s, e) => MoveItem(1);
+            this.Controls.Add(btnEdit);
+            this.Controls.Add(btnDelete);
+            this.Controls.Add(btnUp);
+            this.Controls.Add(btnDown);
+
+            int inputY = panelTop + panelHeight - (int)(28 * uiScale);
+            valLabel = new Label { Text = "値：", Location = new Point(RX, inputY + (int)(4 * uiScale)), Size = new Size((int)(28 * uiScale), (int)(20 * uiScale)) };
+            inputEdit = new TextBox { Location = new Point(RX + (int)(30 * uiScale), inputY), Size = new Size(RW - btnW - SP - (int)(34 * uiScale), (int)(24 * uiScale)) };
+            btnAddOK = new Button { Text = "リストへ追加", Location = new Point(BX, inputY), Size = new Size(btnW, (int)(24 * uiScale)) };
+            btnAddOK.Click += (s, e) => CommitItem();
+            this.Controls.Add(valLabel);
+            this.Controls.Add(inputEdit);
+            this.Controls.Add(btnAddOK);
+
+            // ---- 秒数パネル ----
+            secondsLabel = new Label { Text = "秒数：", Location = new Point(RX, panelTop), Size = new Size((int)(60 * uiScale), (int)(24 * uiScale)) };
+            secondsCtrl = new NumericUpDown
+            {
+                Location = new Point(RX + (int)(64 * uiScale), panelTop),
+                Size = new Size((int)(80 * uiScale), (int)(24 * uiScale)),
+                Minimum = 1,
+                Maximum = 3600,
+                Value = 45,
+            };
+            this.Controls.Add(secondsLabel);
+            this.Controls.Add(secondsCtrl);
+
+            // ---- 上級者向け設定パネル ----
+            chkAppExitEnd = new CheckBox
+            {
+                Text = "トレイメニューに「常駐の終了」を表示する",
+                Location = new Point(RX, panelTop),
+                Size = new Size(RW, (int)(24 * uiScale)),
+            };
+            chkDarkMode = new CheckBox
+            {
+                Text = "トレイメニューをダークモードにする（再起動後に反映）",
+                Location = new Point(RX, panelTop + (int)(28 * uiScale)),
+                Size = new Size(RW, (int)(24 * uiScale)),
+            };
+            advNote = new Label
+            {
+                Text = "※ ここで変更した内容は「保存して閉じる」または「適用」を押すまで反映されません。",
+                Location = new Point(RX, panelTop + (int)(60 * uiScale)),
+                Size = new Size(RW, (int)(40 * uiScale)),
+            };
+            this.Controls.Add(chkAppExitEnd);
+            this.Controls.Add(chkDarkMode);
+            this.Controls.Add(advNote);
+
+            // ---- MS-IME入力設定パネル ----
+            chkKeyAssign = new CheckBox
+            {
+                Text = "変換キー→IME-ON / 無変換キー→IME-OFFに割り当てる",
+                Location = new Point(RX, panelTop),
+                Size = new Size(RW, (int)(24 * uiScale)),
+            };
+            chkMsImeSwitch = new CheckBox
+            {
+                Text = "スペース / 句読点切替を有効にする",
+                Location = new Point(RX, panelTop + (int)(28 * uiScale)),
+                Size = new Size(RW, (int)(24 * uiScale)),
+            };
+
+            // 左カラム：スペース設定  右カラム：句読点設定
+            int colGap = (int)(16 * uiScale);
+            int halfW = (RW - colGap) / 2;
+            int colL = RX;
+            int colR = RX + halfW + colGap;
+            int lblW = (int)(56 * uiScale);
+            int ddX = lblW + (int)(4 * uiScale);
+            int ddW = (int)((halfW - ddX) * 0.8);
+            int rowH = (int)(20 * uiScale);
+            int yHeader = panelTop + (int)(62 * uiScale);
+            int yInit = panelTop + (int)(81 * uiScale);
+            int yTo = panelTop + (int)(109 * uiScale);
+            int lblDy = (int)(4 * uiScale);
+
+            Label lblSpaceHeader = MakeMsImeLabel("── スペース ──────────", colL, yHeader, halfW, (int)(18 * uiScale));
+            Label lblSpaceInit = MakeMsImeLabel("初期値：", colL, yInit + lblDy, lblW, rowH);
+            cmbSpaceInit = MakeMsImeCombo(InputSpaceLabels, colL + ddX, yInit, ddW);
+            Label lblSpaceTo = MakeMsImeLabel("切替先：", colL, yTo + lblDy, lblW, rowH);
+            cmbSpaceTo = MakeMsImeCombo(InputSpaceLabels, colL + ddX, yTo, ddW);
+
+            Label lblPunctHeader = MakeMsImeLabel("── 句読点 ──────────", colR, yHeader, halfW, (int)(18 * uiScale));
+            Label lblPunctInit = MakeMsImeLabel("初期値：", colR, yInit + lblDy, lblW, rowH);
+            cmbPunctInit = MakeMsImeCombo(PunctuationLabels, colR + ddX, yInit, ddW);
+            Label lblPunctTo = MakeMsImeLabel("切替先：", colR, yTo + lblDy, lblW, rowH);
+            cmbPunctTo = MakeMsImeCombo(PunctuationLabels, colR + ddX, yTo, ddW);
+
+            Label msimeHint = MakeMsImeLabel(
+                "初期値：起動時・保存時にMS-IMEへ書き込む設定値です。\r\n" +
+                "切替先：トレイメニューの切替項目を押したときの値です。もう一度押すと初期値に戻ります。\r\n" +
+                "終了時はスペース・句読点を初期値に、キー割り当てを変更前の設定に戻します。",
+                RX, panelTop + (int)(144 * uiScale), RW, (int)(110 * uiScale));
+
+            msimeControls = new Control[]
+            {
+                chkKeyAssign, chkMsImeSwitch,
+                lblSpaceHeader, lblSpaceInit, cmbSpaceInit, lblSpaceTo, cmbSpaceTo,
+                lblPunctHeader, lblPunctInit, cmbPunctInit, lblPunctTo, cmbPunctTo,
+                msimeHint,
+            };
+            this.Controls.AddRange(msimeControls);
+
+            // ---- 下部ボタン ----
+            int btnY = H - (int)(36 * uiScale);
+            btnSave = new Button { Text = "保存して閉じる", Location = new Point(RX, btnY), Size = new Size((int)(120 * uiScale), (int)(28 * uiScale)) };
+            btnApply = new Button { Text = "適用", Location = new Point(RX + (int)(124 * uiScale), btnY), Size = new Size((int)(80 * uiScale), (int)(28 * uiScale)) };
+            btnCancel = new Button { Text = "キャンセル", Location = new Point(W - SP - (int)(80 * uiScale), btnY), Size = new Size((int)(80 * uiScale), (int)(28 * uiScale)) };
+            btnSave.Click += (s, e) => { if (SaveAll()) { this.DialogResult = DialogResult.OK; this.Close(); } };
+            btnApply.Click += (s, e) => SaveAll();
+            btnCancel.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
+            this.AcceptButton = btnSave;
+            this.Controls.Add(btnSave);
+            this.Controls.Add(btnApply);
+            this.Controls.Add(btnCancel);
+
+            if (darkModeEnabled)
+            {
+                foreach (Control c in this.Controls)
+                {
+                    if (c is Label || c is CheckBox)
+                        c.ForeColor = Color.White;
+                    if (c is Button || c is TextBox || c is ListBox || c is NumericUpDown || c is ComboBox)
+                    {
+                        c.BackColor = Color.FromArgb(45, 45, 45);
+                        c.ForeColor = Color.White;
+                    }
+                }
+            }
+        }
+
+        private static Label MakeMsImeLabel(string text, int x, int y, int w, int h)
+        {
+            return new Label { Text = text, Location = new Point(x, y), Size = new Size(w, h) };
+        }
+
+        private static ComboBox MakeMsImeCombo(string[] items, int x, int y, int w)
+        {
+            var cmb = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Location = new Point(x, y),
+                Width = w,
+            };
+            cmb.Items.AddRange(items);
+            return cmb;
+        }
+
+        private static void SetAppSetting(Configuration config, string key, string value)
+        {
+            if (config.AppSettings.Settings[key] != null)
+                config.AppSettings.Settings[key].Value = value;
+            else
+                config.AppSettings.Settings.Add(key, value);
+        }
+
+        private void LoadCurrentValues()
+        {
+            foreach (var cat in categories)
+            {
+                if (cat.Type == "list")
+                {
+                    string[] source = List[cat.ListIndex];
+                    categoryItems[Array.IndexOf(categories, cat)] = source != null
+                        ? new List<string>(source)
+                        : new List<string>();
+                }
+            }
+            secondsCtrl.Value = Math.Max(secondsCtrl.Minimum, Math.Min(secondsCtrl.Maximum, noKeyInputInterval / 1000));
+            chkAppExitEnd.Checked = AppExitEndEnabled;
+            chkDarkMode.Checked = darkModeEnabled;
+
+            // ---- MS-IME入力設定 ----
+            // キー割り当て: 設定済みならその値、未設定ならレジストリの現在値
+            string keyAssignBuff = ConfigurationManager.AppSettings["KeyAssignment"];
+            chkKeyAssign.Checked = !string.IsNullOrEmpty(keyAssignBuff)
+                ? keyAssignBuff == "1"
+                : ReadMsImeDword("IsKeyAssignmentEnabled") == 1;
+
+            // 切替の有効/無効: 明示設定があればその値、未設定なら従来の設定値の有無で判定
+            string switchBuff = ConfigurationManager.AppSettings["MsImeSwitch"];
+            string punctBuff = ConfigurationManager.AppSettings["Punctuation"];
+            string spaceBuff = ConfigurationManager.AppSettings["SpaceWidth"];
+            chkMsImeSwitch.Checked = string.IsNullOrEmpty(switchBuff)
+                ? (IsMsImePairConfigured(punctBuff) || IsMsImePairConfigured(spaceBuff))
+                : switchBuff == "1";
+
+            // 初期値/切替先: 設定済みならその値、未設定ならレジストリの現在値を初期値にする
+            int regSpace = ReadMsImeDword("InputSpace") ?? IME_AUTO_WIDTH_SPACE;
+            if (regSpace < IME_AUTO_WIDTH_SPACE || regSpace > IME_HALF_WIDTH_SPACE)
+                regSpace = IME_AUTO_WIDTH_SPACE;
+            int? regOption1 = ReadMsImeDword("option1");
+            int regPunct = regOption1.HasValue ? (regOption1.Value >> 16) & 0x3 : IME_TOUTEN_KUTENN;
+
+            int spaceInit = regSpace;
+            int spaceTo = regSpace == IME_HALF_WIDTH_SPACE ? IME_FULL_WIDTH_SPACE : IME_HALF_WIDTH_SPACE;
+            if (TryParseConfigPair(spaceBuff, IME_HALF_WIDTH_SPACE, out int cfgSpaceInit, out int cfgSpaceTo)
+                && !(cfgSpaceInit == 0 && cfgSpaceTo == 0))
+            {
+                spaceInit = cfgSpaceInit;
+                spaceTo = cfgSpaceTo;
+            }
+
+            int punctInit = regPunct;
+            int punctTo = IME_COMMA_KUTENN;
+            if (TryParseConfigPair(punctBuff, IME_COMMA_KUTENN, out int cfgPunctInit, out int cfgPunctTo)
+                && !(cfgPunctInit == 0 && cfgPunctTo == 0))
+            {
+                punctInit = cfgPunctInit;
+                punctTo = cfgPunctTo;
+            }
+
+            cmbSpaceInit.SelectedIndex = spaceInit;
+            cmbSpaceTo.SelectedIndex = spaceTo;
+            cmbPunctInit.SelectedIndex = punctInit;
+            cmbPunctTo.SelectedIndex = punctTo;
+        }
+
+        private void CatList_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            int idx = catList.SelectedIndex;
+            if (idx < 0)
+                return;
+            ConfirmPendingInput();
+            selectedCategoryIndex = idx;
+            RenderCategory(idx);
+        }
+
+        private void RenderCategory(int idx)
+        {
+            catList.SelectedIndexChanged -= CatList_SelectedIndexChanged;
+            catList.SelectedIndex = idx;
+            catList.SelectedIndexChanged += CatList_SelectedIndexChanged;
+
+            var cat = categories[idx];
+            descLabel.Text = cat.Desc;
+
+            bool isList = cat.Type == "list";
+            bool isSeconds = cat.Type == "seconds";
+            bool isAdvanced = cat.Type == "advanced";
+            bool isMsIme = cat.Type == "msime";
+
+            itemList.Visible = isList;
+            btnEdit.Visible = isList;
+            btnDelete.Visible = isList;
+            btnUp.Visible = isList;
+            btnDown.Visible = isList;
+            valLabel.Visible = isList;
+            inputEdit.Visible = isList;
+            btnAddOK.Visible = isList;
+
+            secondsLabel.Visible = isSeconds;
+            secondsCtrl.Visible = isSeconds;
+
+            chkAppExitEnd.Visible = isAdvanced;
+            chkDarkMode.Visible = isAdvanced;
+            advNote.Visible = isAdvanced;
+
+            foreach (Control c in msimeControls)
+                c.Visible = isMsIme;
+
+            if (isList)
+            {
+                editingIndex = -1;
+                inputEdit.Text = "";
+                btnAddOK.Text = "リストへ追加";
+                RefreshListBox(0);
+            }
+        }
+
+        private List<string> CurrentItems => categoryItems[selectedCategoryIndex];
+
+        private void RefreshListBox(int selectOneBased)
+        {
+            var items = CurrentItems;
+            itemList.BeginUpdate();
+            itemList.Items.Clear();
+            foreach (var v in items)
+                itemList.Items.Add(v);
+            itemList.EndUpdate();
+            if (selectOneBased > 0 && selectOneBased <= items.Count)
+                itemList.SelectedIndex = selectOneBased - 1;
+            else if (items.Count > 0)
+                itemList.SelectedIndex = 0;
+        }
+
+        private void StartEdit()
+        {
+            int idx = itemList.SelectedIndex;
+            if (idx < 0)
+                return;
+            editingIndex = idx;
+            inputEdit.Text = CurrentItems[idx];
+            btnAddOK.Text = "更新";
+            inputEdit.Focus();
+        }
+
+        private void CommitItem()
+        {
+            string val = inputEdit.Text.Trim();
+            if (val.Length == 0)
+                return;
+            var items = CurrentItems;
+            if (editingIndex < 0)
+            {
+                items.Add(val);
+                RefreshListBox(items.Count);
+            }
+            else
+            {
+                items[editingIndex] = val;
+                RefreshListBox(editingIndex + 1);
+                editingIndex = -1;
+            }
+            inputEdit.Text = "";
+            btnAddOK.Text = "リストへ追加";
+            inputEdit.Focus();
+        }
+
+        private void DeleteItem()
+        {
+            int idx = itemList.SelectedIndex;
+            if (idx < 0)
+                return;
+            var items = CurrentItems;
+            items.RemoveAt(idx);
+            RefreshListBox(Math.Min(idx + 1, items.Count));
+        }
+
+        private void MoveItem(int direction)
+        {
+            int idx = itemList.SelectedIndex;
+            var items = CurrentItems;
+            int newIdx = idx + direction;
+            if (idx < 0 || newIdx < 0 || newIdx >= items.Count)
+                return;
+            (items[idx], items[newIdx]) = (items[newIdx], items[idx]);
+            RefreshListBox(newIdx + 1);
+        }
+
+        // 値欄に未確定の入力が残っていたら確認する
+        private void ConfirmPendingInput()
+        {
+            var cat = categories[selectedCategoryIndex];
+            if (cat.Type != "list")
+                return;
+            string val = inputEdit.Text.Trim();
+            if (val.Length == 0)
+                return;
+            string action = editingIndex < 0 ? "追加" : "更新";
+            var result = MessageBox.Show(
+                $"値欄に入力が残っています：\n\n    {val}\n\nリストに{action}しますか？",
+                "未確定の入力", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            if (result == DialogResult.Yes)
+                CommitItem();
+            else
+            {
+                inputEdit.Text = "";
+                btnAddOK.Text = "リストへ追加";
+                editingIndex = -1;
+            }
+        }
+
+        private bool SaveAll()
+        {
+            ConfirmPendingInput();
+
+            Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+
+            for (int i = 0; i < categories.Length; i++)
+            {
+                var cat = categories[i];
+                if (cat.Type == "list")
+                {
+                    string[] arr = categoryItems[i].Distinct().ToArray();
+                    List[cat.ListIndex] = arr;
+                    config.AppSettings.Settings[cat.AppSettingKey].Value = string.Join(",", arr);
+                }
+            }
+
+            int seconds = (int)secondsCtrl.Value;
+            noKeyInputInterval = seconds * 1000;
+            config.AppSettings.Settings["NoKeyInputTime"].Value = (seconds / 60.0).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture);
+
+            AppExitEndEnabled = chkAppExitEnd.Checked;
+            config.AppSettings.Settings["AppExitEnd"].Value = AppExitEndEnabled ? "1" : "0";
+
+            darkModeEnabled = chkDarkMode.Checked;
+            config.AppSettings.Settings["IsDarkMode"].Value = darkModeEnabled ? "on" : "off";
+
+            // MS-IME入力設定(設定ファイルに項目が無い場合は追加する)
+            SetAppSetting(config, "KeyAssignment", chkKeyAssign.Checked ? "1" : "0");
+            SetAppSetting(config, "MsImeSwitch", chkMsImeSwitch.Checked ? "1" : "0");
+            SetAppSetting(config, "SpaceWidth", $"{cmbSpaceInit.SelectedIndex},{cmbSpaceTo.SelectedIndex}");
+            SetAppSetting(config, "Punctuation", $"{cmbPunctInit.SelectedIndex},{cmbPunctTo.SelectedIndex}");
+
+            config.Save(ConfigurationSaveMode.Modified);
+            ConfigurationManager.RefreshSection("appSettings");
+
+            // レジストリとトレイメニューへ即時反映する
+            ApplyMsImeSettings();
+            Debug.WriteLine("設定を保存しました");
+            return true;
+        }
+    }
     private void MenuReload_Click(object sender, EventArgs e)
     {
         var map = new ExeConfigurationFileMap { ExeConfigFilename = "AlwaysIME.dll.config" };
@@ -1092,9 +1857,9 @@ class ResidentTest : Form
 
                 // appSettingsセクションを再読み込み
                 ConfigurationManager.RefreshSection("appSettings");
+                RestoreMsImeSwitchValues();
                 InitializeAppConfig();
-                menuPunctuation.Text = "「" + PunctuationText[(val[ConfigPunctuation][1] >> 16) & 0x3] + "」に切替(&P)";
-                menuSpace.Text = SpaceWidthText[val[ConfigSpaceWidth][1]] + "スペースに切替(&S)";
+                UpdateMsImeMenu();
                 this.timer.Interval = imeInterval;
                 // メニュー - 終了の位置も再起動後に有効
                 MessageBox.Show("設定を反映しました。\n※ダークモードは再起動後に有効。", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Information);
