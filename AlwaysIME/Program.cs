@@ -134,6 +134,9 @@ class ResidentTest : Form
     private int iconsize;
     private ToolStripMenuItem menuPunctuation;
     private ToolStripMenuItem menuSpace;
+    private ToolStripSeparator separatorPunct;
+    private ToolStripSeparator separatorSpace;
+    private static ResidentTest currentInstance;
     const int ICON_RED = 0;
     const int ICON_GREEN = 1;
     const int ICON_GRAY = 2;
@@ -287,6 +290,7 @@ class ResidentTest : Form
     public ResidentTest()
     {
         this.ShowInTaskbar = false;
+        currentInstance = this;
         this.setComponents();
         this.timer = new System.Windows.Forms.Timer();
         this.timer.Interval = imeInterval;
@@ -307,6 +311,7 @@ class ResidentTest : Form
         { "Punctuation", "0,0" },
         { "SpaceWidth", "0,0" },
         { "AppExitEnd", "1" },
+        { "MsImeSwitch", "0" },
     };
 
     // 設定値が不正な場合に確認ダイアログを表示する。
@@ -666,8 +671,18 @@ class ResidentTest : Form
         {
             FWBackgroundArgv = buff;
         }
+        // MS-IME入力設定(スペース/句読点切替)の有効/無効
+        // 設定画面で明示的に無効("0")にした場合のみ、レジストリへの書き込みと切替を行わない。
+        // 未設定の場合は従来どおり Punctuation / SpaceWidth の設定値で動作する。
+        string msImeSwitchBuff = ConfigurationManager.AppSettings["MsImeSwitch"];
+        if (!string.IsNullOrEmpty(msImeSwitchBuff) && msImeSwitchBuff != "0" && msImeSwitchBuff != "1")
+        {
+            HandleInvalidConfigValue("MsImeSwitch");
+            msImeSwitchBuff = "0";
+        }
+        bool msImeSwitchActive = msImeSwitchBuff != "0";
         buff = ConfigurationManager.AppSettings["Punctuation"];
-        if (!string.IsNullOrEmpty(buff))
+        if (!string.IsNullOrEmpty(buff) && msImeSwitchActive)
         {
             int temp = 0x7FFCFFFF & (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], valueType[ConfigPunctuation]);
             string[] parts = buff.Split(',');
@@ -702,7 +717,7 @@ class ResidentTest : Form
             }
         }
         buff = ConfigurationManager.AppSettings["SpaceWidth"];
-        if (!string.IsNullOrEmpty(buff))
+        if (!string.IsNullOrEmpty(buff) && msImeSwitchActive)
         {
             string[] parts = buff.Split(',');
             val[ConfigSpaceWidth] = new int[2];
@@ -753,6 +768,23 @@ class ResidentTest : Form
             AppExitEndEnabled = true;
         }
     }
+
+    // トレイメニューの句読点/スペース切替項目の表示・文言を現在の設定に合わせる
+    private void UpdateMsImeMenu()
+    {
+        bool punctSwitch = val[ConfigPunctuation][0] != val[ConfigPunctuation][1];
+        bool spaceSwitch = val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1];
+        // クリックしたときに適用される値を表示する
+        int nextPunct = (SetPunctuationMode == val[ConfigPunctuation][0]) ? val[ConfigPunctuation][1] : val[ConfigPunctuation][0];
+        int nextSpace = (SetSpaceMode == val[ConfigSpaceWidth][0]) ? val[ConfigSpaceWidth][1] : val[ConfigSpaceWidth][0];
+        menuPunctuation.Text = "「" + PunctuationText[(nextPunct >> 16) & 0x3] + "」に切替(&P)";
+        menuSpace.Text = SpaceWidthText[nextSpace] + "スペースに切替(&S)";
+        menuPunctuation.Visible = punctSwitch;
+        separatorPunct.Visible = punctSwitch;
+        menuSpace.Visible = spaceSwitch;
+        separatorSpace.Visible = spaceSwitch;
+    }
+
     private void Close_Click(object sender, EventArgs e)
     {
         DialogResult result = MessageBox.Show("AlwaysIME を終了します。", "確認", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -833,6 +865,7 @@ class ResidentTest : Form
         MenuItemReload.Click += MenuReload_Click;
 
         ToolStripSeparator separator4 = new ToolStripSeparator();
+        separatorPunct = separator4;
 
         menuPunctuation = new ToolStripMenuItem();
         // menuPunctuation.Text = "句読点切替(&P)";
@@ -840,6 +873,7 @@ class ResidentTest : Form
         menuPunctuation.Click += new EventHandler(Punctuation_Click);
 
         ToolStripSeparator separator5 = new ToolStripSeparator();
+        separatorSpace = separator5;
 
         menuSpace = new ToolStripMenuItem();
         // menuSpace.Text = "スペース切替(&S)";
@@ -925,24 +959,21 @@ class ResidentTest : Form
             menu.Items.Add(separator3);
         menu.Items.Add(MenuItemRegistrationDialog);
         menu.Items.Add(MenuItemReload);
-        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
-        {
-            if (!darkModeEnabled)
-                menu.Items.Add(separator4);
-            menu.Items.Add(menuPunctuation);
-        }
-        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
-        {
-            if (!darkModeEnabled)
-                menu.Items.Add(separator5);
-            menu.Items.Add(menuSpace);
-        }
+        // 表示/非表示は UpdateMsImeMenu() で切り替える
+        // (設定画面から有効/無効を変更したときに再起動なしで反映するため)
+        if (!darkModeEnabled)
+            menu.Items.Add(separator4);
+        menu.Items.Add(menuPunctuation);
+        if (!darkModeEnabled)
+            menu.Items.Add(separator5);
+        menu.Items.Add(menuSpace);
         if (AppExitEndEnabled)
         {
             if (!darkModeEnabled)
                 menu.Items.Add(separator6);
             menu.Items.Add(menuItem);
         }
+        UpdateMsImeMenu();
         icon.ContextMenuStrip = menu;
     }
     public class DialogForm : Form
@@ -1093,8 +1124,7 @@ class ResidentTest : Form
                 // appSettingsセクションを再読み込み
                 ConfigurationManager.RefreshSection("appSettings");
                 InitializeAppConfig();
-                menuPunctuation.Text = "「" + PunctuationText[(val[ConfigPunctuation][1] >> 16) & 0x3] + "」に切替(&P)";
-                menuSpace.Text = SpaceWidthText[val[ConfigSpaceWidth][1]] + "スペースに切替(&S)";
+                UpdateMsImeMenu();
                 this.timer.Interval = imeInterval;
                 // メニュー - 終了の位置も再起動後に有効
                 MessageBox.Show("設定を反映しました。\n※ダークモードは再起動後に有効。", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Information);
