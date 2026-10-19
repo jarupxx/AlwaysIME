@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -16,8 +17,9 @@ using System.Text.RegularExpressions;
 class MainWindow
 {
     static Mutex mutex;
-    static FileSystemWatcher watcher;
-    static string restartSignalFile = Path.Combine(Path.GetTempPath(), "AlwaysIME_restart_signal");
+    static EventWaitHandle restartSignalEvent;
+    const string RestartSignalEventName = "AlwaysIME_RestartSignal";
+    static RegisteredWaitHandle restartSignalRegisteredWait;
 
     [STAThread]
     static void Main()
@@ -33,36 +35,42 @@ class MainWindow
             ResidentTest rm = new ResidentTest();
             WatchForRestartSignal();
             Application.Run();
+            restartSignalRegisteredWait?.Unregister(null);
+            restartSignalEvent?.Dispose();
             mutex.ReleaseMutex();
         }
         else
         {
             // すでに起動しているインスタンスがある場合は、再起動シグナルを送信
-            File.Create(restartSignalFile).Close();
+            try
+            {
+                using EventWaitHandle signalEvent = EventWaitHandle.OpenExisting(RestartSignalEventName);
+                signalEvent.Set();
+            }
+            catch (WaitHandleCannotBeOpenedException)
+            {
+                // 既存インスタンスがまだイベントを作成していない場合は何もできない
+                Trace.WriteLine("再起動シグナル用イベントが見つかりません。");
+            }
         }
     }
 
     static void WatchForRestartSignal()
     {
-        watcher = new FileSystemWatcher
-        {
-            Path = Path.GetDirectoryName(restartSignalFile),
-            Filter = Path.GetFileName(restartSignalFile),
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.CreationTime
-        };
+        // AutoReset: Set()を受け取ったら自動的に非シグナル状態に戻る
+        restartSignalEvent = new EventWaitHandle(false, EventResetMode.AutoReset, RestartSignalEventName);
 
-        watcher.Created += OnRestartSignalReceived;
-        watcher.EnableRaisingEvents = true;
+        // イベントがシグナルされたらスレッドプールのスレッドでコールバックを実行する
+        restartSignalRegisteredWait = ThreadPool.RegisterWaitForSingleObject(
+            restartSignalEvent,
+            (state, timedOut) => OnRestartSignalReceived(),
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
     }
 
-    static void OnRestartSignalReceived(object sender, FileSystemEventArgs e)
+    static void OnRestartSignalReceived()
     {
-        // シグナルファイルを削除
-        if (File.Exists(restartSignalFile))
-        {
-            File.Delete(restartSignalFile);
-        }
-
         RestartApplication();
     }
 
@@ -287,7 +295,187 @@ class ResidentTest : Form
         this.lastInputTime = DateTime.Now;
     }
 
+    // 設定項目ごとの初期値(AlwaysIME.dll.configへ書き戻す際に使用する)
+    private static readonly Dictionary<string, string> DefaultConfigValues = new Dictionary<string, string>
+    {
+        { "AlwaysIMEMode", "1" },
+        { "intervalTime", "200" },
+        { "SuspendFewTime", "5" },
+        { "SuspendTime", "45" },
+        { "NoKeyInputTime", "0.1" },
+        { "DelayBackgroundTime", "" },
+        { "Punctuation", "0,0" },
+        { "SpaceWidth", "0,0" },
+        { "AppExitEnd", "1" },
+    };
+
+    // 設定値が不正な場合に確認ダイアログを表示する。
+    // 「初期値にする」: 初期値をAlwaysIME.dll.configへ書き戻して続行(この呼び出し元の
+    //                   フォールバック処理でメモリ上の値も初期値になる)。
+    // 「設定を確認」  : AlwaysIME.dll.configを既定のアプリで開き、閉じたら設定を
+    //                   再読み込みして最初からやり直す。
+    private static void HandleInvalidConfigValue(string settingKey)
+    {
+        using (var dialog = new ConfigWarningDialog($"{settingKey}の設定が間違っています。"))
+        {
+            DialogResult result = dialog.ShowDialog();
+            if (result == DialogResult.Yes)
+            {
+                // 初期値にする
+                UpdateConfigDefaultValue(settingKey);
+            }
+            else
+            {
+                // 設定を確認する
+                OpenConfigFileAndReload();
+            }
+        }
+    }
+
+    // 指定した設定項目の値をAlwaysIME.dll.config上で初期値に書き換える
+    private static void UpdateConfigDefaultValue(string settingKey)
+    {
+        if (!DefaultConfigValues.TryGetValue(settingKey, out string defaultValue))
+        {
+            return;
+        }
+
+        try
+        {
+            var map = new ExeConfigurationFileMap { ExeConfigFilename = "AlwaysIME.dll.config" };
+            Configuration config = ConfigurationManager.OpenMappedExeConfiguration(map, ConfigurationUserLevel.None);
+
+            if (config.AppSettings.Settings[settingKey] != null)
+            {
+                config.AppSettings.Settings[settingKey].Value = defaultValue;
+            }
+            else
+            {
+                config.AppSettings.Settings.Add(settingKey, defaultValue);
+            }
+
+            config.Save(ConfigurationSaveMode.Modified);
+            ConfigurationManager.RefreshSection("appSettings");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("設定ファイルへの書き込みに失敗しました: " + ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    // AlwaysIME.dll.configを既定のアプリケーションで開き、閉じられたら設定を
+    // 再読み込みして最初からやり直す。再読み込みに成功した場合は
+    // ConfigReloadRequestedExceptionを送出し、呼び出し元に残る古い状態の
+    // 処理(不正値のままの続行部分)を打ち切る。
+    private static void OpenConfigFileAndReload()
+    {
+        var map = new ExeConfigurationFileMap { ExeConfigFilename = "AlwaysIME.dll.config" };
+        string configFilePath = ConfigurationManager.OpenMappedExeConfiguration(map, ConfigurationUserLevel.None).FilePath;
+
+        try
+        {
+            Process editorProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = configFilePath,
+                UseShellExecute = true
+            });
+
+            if (editorProcess != null)
+            {
+                // エディタが閉じられるまで待機
+                editorProcess.WaitForExit();
+
+                // 変更後の内容を反映して最初からやり直す
+                ConfigurationManager.RefreshSection("appSettings");
+                InitializeAppConfig();
+
+                // 上のInitializeAppConfig()で最新状態まで処理済みのため、
+                // 呼び出し元(古い設定値のまま処理を続けようとしている箇所)を打ち切る
+                throw new ConfigReloadRequestedException();
+            }
+        }
+        catch (ConfigReloadRequestedException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show("設定ファイルを開けませんでした: " + ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    // 設定値が不正なときに「初期値にする」か「設定を確認」かを選択させるダイアログ
+    private class ConfigWarningDialog : Form
+    {
+        public ConfigWarningDialog(string message)
+        {
+            float UIScale;
+            using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
+                UIScale = graphics.DpiX / 96;
+            this.Font = new Font("Meiryo", (int)(9 * Math.Pow(UIScale, 1.0 / 3.0)), FontStyle.Regular);
+            this.Text = "AlwaysIME";
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.Size = new Size((int)(400 * UIScale), (int)(170 * UIScale));
+
+            Label messageLabel = new Label();
+            messageLabel.Text = message + "\n初期値にするか、設定を確認してください。";
+            messageLabel.Location = new Point((int)(20 * UIScale), (int)(20 * UIScale));
+            messageLabel.Size = new Size((int)(360 * UIScale), (int)(60 * UIScale));
+
+            Button defaultButton = new Button();
+            defaultButton.Text = "初期値にする(&D)";
+            defaultButton.Size = new Size((int)(160 * UIScale), (int)(32 * UIScale));
+            defaultButton.Location = new Point((int)(30 * UIScale), (int)(95 * UIScale));
+            defaultButton.DialogResult = DialogResult.Yes;
+
+            Button checkButton = new Button();
+            checkButton.Text = "設定を確認(&C)";
+            checkButton.Size = new Size((int)(160 * UIScale), (int)(32 * UIScale));
+            checkButton.Location = new Point((int)(205 * UIScale), (int)(95 * UIScale));
+            checkButton.DialogResult = DialogResult.No;
+
+            if (darkModeEnabled)
+            {
+                this.BackColor = Color.FromArgb(32, 32, 32);
+                this.ForeColor = Color.White;
+                defaultButton.BackColor = Color.FromArgb(55, 55, 55);
+                defaultButton.ForeColor = Color.White;
+                defaultButton.FlatStyle = FlatStyle.Flat;
+                checkButton.BackColor = Color.FromArgb(55, 55, 55);
+                checkButton.ForeColor = Color.White;
+                checkButton.FlatStyle = FlatStyle.Flat;
+            }
+
+            this.Controls.Add(messageLabel);
+            this.Controls.Add(defaultButton);
+            this.Controls.Add(checkButton);
+            this.AcceptButton = defaultButton;
+            this.CancelButton = defaultButton;
+        }
+    }
+
+    // 設定の再読み込みが発生したことを示すための内部シグナル用例外。
+    // 「設定を確認」でエディタを閉じた後に最新状態で処理をやり直した場合、
+    // 呼び出し元に残っている古い状態の処理を打ち切るために使う。
+    private class ConfigReloadRequestedException : Exception { }
+
     public static void InitializeAppConfig()
+    {
+        try
+        {
+            InitializeAppConfigCore();
+        }
+        catch (ConfigReloadRequestedException)
+        {
+            // 内部でInitializeAppConfig()を再実行済みのため、
+            // ここでは何もせず古い状態の処理を終了する。
+        }
+    }
+
+    private static void InitializeAppConfigCore()
     {
         List[PassArray] = null;
         List[ImeOffArray] = null;
@@ -315,17 +503,14 @@ class ResidentTest : Form
             {
                 ImeModeGlobal = IMEMODE_ON;
             }
+            else if (int.TryParse(buff, out int parsedImeMode) && parsedImeMode >= 1 && parsedImeMode <= 3)
+            {
+                ImeModeGlobal = parsedImeMode;
+            }
             else
             {
-                if (int.Parse(buff) >= 1 && int.Parse(buff) <= 3)
-                {
-                    ImeModeGlobal = int.Parse(buff);
-                }
-                else
-                {
-                    MessageBox.Show("AlwaysIMEModeの設定が間違っています");
-                    ImeModeGlobal = IMEMODE_ON;
-                }
+                HandleInvalidConfigValue("AlwaysIMEMode");
+                ImeModeGlobal = IMEMODE_ON;
             }
         }
         else
@@ -371,27 +556,62 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["intervalTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            imeInterval = int.Parse(buff);
+            if (int.TryParse(buff, out int parsedIntervalTime))
+            {
+                imeInterval = parsedIntervalTime;
+            }
+            else
+            {
+                HandleInvalidConfigValue("intervalTime");
+            }
         }
         buff = ConfigurationManager.AppSettings["SuspendFewTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            SuspendFewInterval = int.Parse(buff);
+            if (int.TryParse(buff, out int parsedSuspendFewTime))
+            {
+                SuspendFewInterval = parsedSuspendFewTime;
+            }
+            else
+            {
+                HandleInvalidConfigValue("SuspendFewTime");
+            }
         }
         buff = ConfigurationManager.AppSettings["SuspendTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            SuspendInterval = int.Parse(buff);
+            if (int.TryParse(buff, out int parsedSuspendTime))
+            {
+                SuspendInterval = parsedSuspendTime;
+            }
+            else
+            {
+                HandleInvalidConfigValue("SuspendTime");
+            }
         }
         buff = ConfigurationManager.AppSettings["NoKeyInputTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            noKeyInputInterval = (int)(float.Parse(buff) * 60 * 1000);
+            if (float.TryParse(buff, out float parsedNoKeyInputTime))
+            {
+                noKeyInputInterval = (int)(parsedNoKeyInputTime * 60 * 1000);
+            }
+            else
+            {
+                HandleInvalidConfigValue("NoKeyInputTime");
+            }
         }
         buff = ConfigurationManager.AppSettings["DelayBackgroundTime"];
         if (!string.IsNullOrEmpty(buff))
         {
-            DelayBackgroundInterval = (int)(float.Parse(buff) * 60 * 1000 / imeInterval);
+            if (float.TryParse(buff, out float parsedDelayBackgroundTime))
+            {
+                DelayBackgroundInterval = (int)(parsedDelayBackgroundTime * 60 * 1000 / imeInterval);
+            }
+            else
+            {
+                HandleInvalidConfigValue("DelayBackgroundTime");
+            }
         }
         buff = ConfigurationManager.AppSettings["OnActivatedAppList"];
         if (!string.IsNullOrEmpty(buff))
@@ -454,13 +674,13 @@ class ResidentTest : Form
             val[ConfigPunctuation] = new int[2];
             for (int i = 0; i < parts.Length; i++)
             {
-                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 3)
+                if (int.TryParse(parts[i], out int parsedPunctuation) && parsedPunctuation >= 0 && parsedPunctuation <= 3)
                 {
-                    val[ConfigPunctuation][i] = temp | int.Parse(parts[i]) << 16;
+                    val[ConfigPunctuation][i] = temp | parsedPunctuation << 16;
                 }
                 else
                 {
-                    MessageBox.Show("Punctuationの設定が間違っています");
+                    HandleInvalidConfigValue("Punctuation");
                     val[ConfigPunctuation] = [0, 0];
                 }
             }
@@ -488,13 +708,13 @@ class ResidentTest : Form
             val[ConfigSpaceWidth] = new int[2];
             for (int i = 0; i < parts.Length; i++)
             {
-                if (int.Parse(parts[i]) >= 0 && int.Parse(parts[i]) <= 2)
+                if (int.TryParse(parts[i], out int parsedSpaceWidth) && parsedSpaceWidth >= 0 && parsedSpaceWidth <= 2)
                 {
-                    val[ConfigSpaceWidth][i] = int.Parse(parts[i]);
+                    val[ConfigSpaceWidth][i] = parsedSpaceWidth;
                 }
                 else
                 {
-                    MessageBox.Show("SpaceWidthの設定が間違っています");
+                    HandleInvalidConfigValue("SpaceWidth");
                     val[ConfigSpaceWidth] = [0, 0];
                 }
             }
@@ -518,13 +738,14 @@ class ResidentTest : Form
         buff = ConfigurationManager.AppSettings["AppExitEnd"];
         if (!string.IsNullOrEmpty(buff))
         {
-            if (int.Parse(buff) == 1)
+            if (int.TryParse(buff, out int parsedAppExitEnd))
             {
-                AppExitEndEnabled = true;
+                AppExitEndEnabled = parsedAppExitEnd == 1;
             }
-            else/* if (int.Parse(buff) == 0)*/
+            else
             {
-                AppExitEndEnabled = false;
+                HandleInvalidConfigValue("AppExitEnd");
+                AppExitEndEnabled = true;
             }
         }
         else
