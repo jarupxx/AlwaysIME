@@ -311,13 +311,24 @@ class ResidentTest : Form
         { "intervalTime", "200" },
         { "SuspendFewTime", "5" },
         { "SuspendTime", "45" },
-        { "NoKeyInputTime", "0.1" },
+        { "NoKeyInputTime", "3" },
         { "DelayBackgroundTime", "" },
-        { "Punctuation", "0,0" },
-        { "SpaceWidth", "0,0" },
+        { "Punctuation", "1,3" },
+        { "SpaceWidth", "1,2" },
         { "AppExitEnd", "1" },
         { "MsImeSwitch", "0" },
         { "KeyAssignment", "" },
+        { "IsDarkMode", "off" },
+        { "PassList", "ShellExperienceHost" },
+        { "ImeOffList", "cmd,WindowsTerminal" },
+        { "ImeOffTitle", "" },
+        { "UpdateTag", "\\(?更新\\)?" },
+        { "OnActivatedAppList", "" },
+        { "OnActivatedAppPath", "" },
+        { "OnActivatedArgv", "" },
+        { "BackgroundAppList", "" },
+        { "BackgroundAppPath", "" },
+        { "BackgroundArgv", "" },
     };
 
     // 設定値が不正な場合に確認ダイアログを表示する。
@@ -1319,6 +1330,13 @@ class ResidentTest : Form
                 Desc = "動作に詳しい方向けの設定です。\r\n通常は変更不要です。",
                 Type = "advanced",
             },
+            new ConfigCategory
+            {
+                AppSettingKey = null,
+                Label = "拡張設定",
+                Desc = "AlwaysIME.dll.config の全設定をここで変更できます。\r\n設定内容の詳細が分からないまま変更しないでください。\r\n「リセット」で初期値に戻せます（保存して閉じる／適用で反映）。",
+                Type = "extended",
+            },
         };
 
         // カテゴリーごとの作業用リスト（"list"タイプのみ使用）
@@ -1352,12 +1370,53 @@ class ResidentTest : Form
         private ComboBox cmbSpaceInit, cmbSpaceTo, cmbPunctInit, cmbPunctTo;
         private Control[] msimeControls;
 
+        // 拡張設定パネル（キー / 値 / リセット）
+        private const string ExtColKey = "colKey";
+        private const string ExtColValue = "colValue";
+        private const string ExtColReset = "colReset";
+        private TextBox extFilter;
+        private DataGridView extGrid;
+        private Font extBoldFont;
+
+        // 拡張設定の各キーの説明（セルにマウスを合わせたときのポップアップ表示）
+        private static readonly Dictionary<string, string> ConfigDescriptions = new Dictionary<string, string>
+        {
+            { "AlwaysIMEMode", "IMEの制御モードです。\n1: IMEオン（常にオンにする）\n2: IMEオフ\n3: グローバル（直前のIME状態を維持する）。" },
+            { "IsDarkMode", "トレイメニューや設定画面をダークモードにします。\non: ダークモード / それ以外: 通常\n※ メニューへの反映は再起動後です。" },
+            { "PassList", "IMEを一切操作しないアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: AlwaysIME,notepad" },
+            { "ImeOffList", "アプリの切り替えやウィンドウタイトルの変化時に、IMEをオフにするアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: cmd,powershell" },
+            { "ImeOffTitle", "ウィンドウタイトルにマッチしたらIMEをオフにする正規表現です。\nカンマ区切りで複数指定でき、全アプリ共通で適用されます。\n例: \\.cs$" },
+            { "UpdateTag", "ウィンドウタイトルの変化を判定するときに無視する部分の正規表現です。\nマッチした部分を除去してから変化を判定します。カンマ区切りで複数指定できます。\n例: \\(更新\\)" },
+            { "intervalTime", "IMEの状態を監視する間隔です（ミリ秒）。\n小さいほど反応が早くなりますが、負荷が増えます。\n例: 200" },
+            { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。" },
+            { "SuspendTime", "トレイメニュー「しばらく無効」で、機能を停止する時間です（分）。" },
+            { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
+            { "DelayBackgroundTime", "BackgroundAppList のアプリが非アクティブになってから、連携アプリ（BackgroundAppPath）を起動するまでの時間です（分）。\n空欄の場合は無効です。" },
+            { "OnActivatedAppList", "アクティブになったときに連携アプリ（OnActivatedAppPath）を起動するアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。" },
+            { "OnActivatedAppPath", "OnActivatedAppList のアプリがアクティブになったときに起動する連携アプリのパスです。\n存在しないパスを指定すると警告が表示されます。" },
+            { "OnActivatedArgv", "OnActivatedAppPath の連携アプリに渡すコマンドライン引数です。" },
+            { "BackgroundAppList", "非アクティブになったときに連携アプリ（BackgroundAppPath）の起動を予約するアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。" },
+            { "BackgroundAppPath", "BackgroundAppList のアプリが非アクティブになり、DelayBackgroundTime が経過したときに起動する連携アプリのパスです。\n存在しないパスを指定すると警告が表示されます。" },
+            { "BackgroundArgv", "BackgroundAppPath の連携アプリに渡すコマンドライン引数です。" },
+            { "Punctuation", "MS-IMEの句読点を「初期値,切替先」の形式で指定します。\n0: ，．  1: 、。  2: 、．  3: ，。\n例: 1,3\n※ MsImeSwitch が 1 のときに有効です。" },
+            { "SpaceWidth", "MS-IMEのスペース入力を「初期値,切替先」の形式で指定します。\n0: 現在の入力モード  1: 常に全角  2: 常に半角\n例: 1,2\n※ MsImeSwitch が 1 のときに有効です。" },
+            { "MsImeSwitch", "スペース / 句読点の切替を有効にするかどうかです。\n1: 有効（トレイメニューから切替できます）\n0: 無効（レジストリへの書き込みを行いません）" },
+            { "KeyAssignment", "変換キー→IME-ON / 無変換キー→IME-OFF の割り当てです。\n1: 割り当てる  0: 割り当てない\n空欄: 管理しない（終了時には変更前の設定に戻します）" },
+            { "AppExitEnd", "トレイメニューの「常駐の終了」の位置です。\n1: メニューの末尾に配置  0: 上部に配置\n※ 反映は再起動後です。" },
+        };
+        private Control[] extControls;
+        private bool extLoading = false;
+        // 読み込み時点（保存済み）の値 / 未保存の変更
+        private readonly Dictionary<string, string> extBaseline = new Dictionary<string, string>();
+        private readonly Dictionary<string, string> extPending = new Dictionary<string, string>();
+
         private Button btnSave, btnApply, btnCancel;
 
         public ConfigForm()
         {
             InitializeComponents();
             LoadCurrentValues();
+            LoadExtendedSettings();
             RenderCategory(0);
         }
 
@@ -1366,7 +1425,7 @@ class ResidentTest : Form
             using (Graphics g = Graphics.FromHwnd(IntPtr.Zero))
                 uiScale = g.DpiX / 96;
 
-            int W = (int)(640 * uiScale);
+            int W = (int)(720 * uiScale);
             int H = (int)(430 * uiScale);
             int LW = (int)(170 * uiScale);
             int SP = (int)(8 * uiScale);
@@ -1535,6 +1594,75 @@ class ResidentTest : Form
             };
             this.Controls.AddRange(msimeControls);
 
+            // ---- 拡張設定パネル（キー / 値 / リセット） ----
+            extFilter = new TextBox
+            {
+                Location = new Point(RX, panelTop),
+                Size = new Size(RW, (int)(24 * uiScale)),
+                PlaceholderText = "フィルタ設定",
+            };
+            extFilter.TextChanged += (s, e) => ApplyExtFilter();
+
+            extGrid = new DataGridView
+            {
+                Location = new Point(RX, panelTop + (int)(28 * uiScale)),
+                Size = new Size(RW, panelHeight - (int)(28 * uiScale)),
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AllowUserToResizeRows = false,
+                RowHeadersVisible = false,
+                MultiSelect = false,
+                SelectionMode = DataGridViewSelectionMode.CellSelect,
+                EditMode = DataGridViewEditMode.EditOnEnter,
+                BackgroundColor = SystemColors.Window,
+                BorderStyle = BorderStyle.FixedSingle,
+            };
+            extGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = ExtColKey,
+                HeaderText = "キー",
+                ReadOnly = true,
+                Width = (int)(150 * uiScale),
+                SortMode = DataGridViewColumnSortMode.Automatic,
+            });
+            extGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = ExtColValue,
+                HeaderText = "値",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                SortMode = DataGridViewColumnSortMode.NotSortable,
+            });
+            extGrid.Columns.Add(new DataGridViewButtonColumn
+            {
+                Name = ExtColReset,
+                HeaderText = "",
+                Text = "リセット",
+                UseColumnTextForButtonValue = true,
+                FlatStyle = FlatStyle.Flat,
+                Width = (int)(76 * uiScale),
+                SortMode = DataGridViewColumnSortMode.NotSortable,
+            });
+            extBoldFont = new Font(extGrid.Font, FontStyle.Bold);
+            extGrid.CellContentClick += ExtGrid_CellContentClick;
+            extGrid.CellEndEdit += ExtGrid_CellEndEdit;
+            extGrid.DataError += (s, e) => e.ThrowException = false;
+
+            if (darkModeEnabled)
+            {
+                extGrid.BackgroundColor = Color.FromArgb(32, 32, 32);
+                extGrid.GridColor = Color.FromArgb(70, 70, 70);
+                extGrid.EnableHeadersVisualStyles = false;
+                extGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(55, 55, 55);
+                extGrid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+                extGrid.DefaultCellStyle.BackColor = Color.FromArgb(45, 45, 45);
+                extGrid.DefaultCellStyle.ForeColor = Color.White;
+                extGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(80, 80, 120);
+                extGrid.DefaultCellStyle.SelectionForeColor = Color.White;
+            }
+
+            extControls = new Control[] { extFilter, extGrid };
+            this.Controls.AddRange(extControls);
+
             // ---- 下部ボタン ----
             int btnY = H - (int)(36 * uiScale);
             btnSave = new Button { Text = "保存して閉じる", Location = new Point(RX, btnY), Size = new Size((int)(120 * uiScale), (int)(28 * uiScale)) };
@@ -1650,11 +1778,161 @@ class ResidentTest : Form
             cmbPunctTo.SelectedIndex = punctTo;
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                extBoldFont?.Dispose();
+            base.Dispose(disposing);
+        }
+
+        // ============================================================
+        // 拡張設定（AlwaysIME.dll.config の全キーを キー / 値 / リセット で編集）
+        // ============================================================
+
+        // AlwaysIME.dll.config の appSettings を読み込んで一覧を作り直す。
+        // ファイルに無い既知のキーは初期値を表示する（編集しない限り書き込まない）。
+        private void LoadExtendedSettings()
+        {
+            extLoading = true;
+            try
+            {
+                extGrid.EndEdit();
+                extGrid.CurrentCell = null;
+                extGrid.Rows.Clear();
+                extBaseline.Clear();
+                extPending.Clear();
+
+                Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
+                foreach (string key in config.AppSettings.Settings.AllKeys)
+                    extBaseline[key] = config.AppSettings.Settings[key].Value ?? "";
+                foreach (var kv in DefaultConfigValues)
+                {
+                    if (!extBaseline.ContainsKey(kv.Key))
+                        extBaseline[kv.Key] = kv.Value;
+                }
+
+                var keys = new List<string>(extBaseline.Keys);
+                keys.Sort(StringComparer.OrdinalIgnoreCase);
+                foreach (string key in keys)
+                {
+                    int row = extGrid.Rows.Add(key, extBaseline[key]);
+                    UpdateExtRowStyle(extGrid.Rows[row]);
+                    SetExtToolTips(extGrid.Rows[row], key);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("設定ファイルの読み込みに失敗しました: " + ex.Message, "エラー", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                extLoading = false;
+            }
+            ApplyExtFilter();
+        }
+
+        // キー・値・リセットの各セルに、説明と初期値をポップアップで表示する
+        private static void SetExtToolTips(DataGridViewRow row, string key)
+        {
+            bool hasDefault = DefaultConfigValues.TryGetValue(key, out string defaultValue);
+            string description = ConfigDescriptions.TryGetValue(key, out string d)
+                ? d
+                : "この項目の説明はありません。";
+            string defaultText = hasDefault
+                ? (defaultValue.Length == 0 ? "初期値: （空欄）" : "初期値: " + defaultValue)
+                : "初期値: （なし）";
+
+            string text = key + "\n\n" + description + "\n\n" + defaultText;
+            row.Cells[ExtColKey].ToolTipText = text;
+            row.Cells[ExtColValue].ToolTipText = text;
+            row.Cells[ExtColReset].ToolTipText = hasDefault
+                ? (defaultValue.Length == 0
+                    ? "「" + key + "」を初期値（空欄）に戻します。"
+                    : "「" + key + "」を初期値「" + defaultValue + "」に戻します。")
+                : "この項目には初期値がないため、リセットできません。";
+        }
+
+        // キーまたは値にフィルタ文字列を含む行だけを表示する
+        private void ApplyExtFilter()
+        {
+            if (extGrid == null || extLoading)
+                return;
+            string filter = extFilter.Text.Trim();
+            extGrid.EndEdit();
+            extGrid.CurrentCell = null; // 現在行は非表示にできないため
+            foreach (DataGridViewRow row in extGrid.Rows)
+            {
+                string key = Convert.ToString(row.Cells[ExtColKey].Value) ?? "";
+                string value = Convert.ToString(row.Cells[ExtColValue].Value) ?? "";
+                row.Visible = filter.Length == 0
+                    || key.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0
+                    || value.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+        }
+
+        // 値セルの編集が終わったら変更を記録する
+        private void ExtGrid_CellEndEdit(object sender, DataGridViewCellEventArgs e)
+        {
+            if (extLoading || e.RowIndex < 0 || extGrid.Columns[e.ColumnIndex].Name != ExtColValue)
+                return;
+            DataGridViewRow row = extGrid.Rows[e.RowIndex];
+            SetExtValue(row, Convert.ToString(row.Cells[ExtColValue].Value) ?? "");
+        }
+
+        // 「リセット」ボタン: そのキーの値を初期値に戻す
+        private void ExtGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || extGrid.Columns[e.ColumnIndex].Name != ExtColReset)
+                return;
+            DataGridViewRow row = extGrid.Rows[e.RowIndex];
+            string key = Convert.ToString(row.Cells[ExtColKey].Value) ?? "";
+            if (!DefaultConfigValues.TryGetValue(key, out string defaultValue))
+                return;
+            extGrid.EndEdit();
+            SetExtValue(row, defaultValue);
+        }
+
+        private void SetExtValue(DataGridViewRow row, string value)
+        {
+            string key = Convert.ToString(row.Cells[ExtColKey].Value) ?? "";
+            extLoading = true;
+            row.Cells[ExtColValue].Value = value;
+            extLoading = false;
+
+            if (extBaseline.TryGetValue(key, out string baseline) && baseline == value)
+                extPending.Remove(key);
+            else
+                extPending[key] = value;
+            UpdateExtRowStyle(row);
+        }
+
+        // 変更済みの値は太字+背景色、初期値のままならリセットボタンを灰色にする
+        private void UpdateExtRowStyle(DataGridViewRow row)
+        {
+            string key = Convert.ToString(row.Cells[ExtColKey].Value) ?? "";
+            string current = Convert.ToString(row.Cells[ExtColValue].Value) ?? "";
+            bool changed = extPending.ContainsKey(key);
+            bool atDefault = !DefaultConfigValues.TryGetValue(key, out string defaultValue) || current == defaultValue;
+
+            DataGridViewCell valueCell = row.Cells[ExtColValue];
+            valueCell.Style.Font = changed ? extBoldFont : null;
+            valueCell.Style.BackColor = changed
+                ? (darkModeEnabled ? Color.FromArgb(75, 65, 25) : Color.FromArgb(255, 250, 205))
+                : Color.Empty;
+
+            DataGridViewCell resetCell = row.Cells[ExtColReset];
+            resetCell.Style.ForeColor = atDefault
+                ? Color.Gray
+                : (darkModeEnabled ? Color.White : SystemColors.ControlText);
+            resetCell.Style.BackColor = darkModeEnabled ? Color.FromArgb(55, 55, 55) : SystemColors.Control;
+        }
+
         private void CatList_SelectedIndexChanged(object sender, EventArgs e)
         {
             int idx = catList.SelectedIndex;
             if (idx < 0)
                 return;
+            extGrid.EndEdit();
             ConfirmPendingInput();
             selectedCategoryIndex = idx;
             RenderCategory(idx);
@@ -1692,6 +1970,9 @@ class ResidentTest : Form
 
             foreach (Control c in msimeControls)
                 c.Visible = isMsIme;
+
+            foreach (Control c in extControls)
+                c.Visible = cat.Type == "extended";
 
             if (isList)
             {
@@ -1828,11 +2109,25 @@ class ResidentTest : Form
             SetAppSetting(config, "SpaceWidth", $"{cmbSpaceInit.SelectedIndex},{cmbSpaceTo.SelectedIndex}");
             SetAppSetting(config, "Punctuation", $"{cmbPunctInit.SelectedIndex},{cmbPunctTo.SelectedIndex}");
 
+            // 拡張設定で変更(リセット含む)したキーを書き込む。他の画面と同じキーを両方で変更した場合は拡張設定を優先する
+            extGrid.EndEdit();
+            foreach (var kv in extPending)
+                SetAppSetting(config, kv.Key, kv.Value);
+
             config.Save(ConfigurationSaveMode.Modified);
             ConfigurationManager.RefreshSection("appSettings");
 
             // レジストリとトレイメニューへ即時反映する
             ApplyMsImeSettings();
+
+            // 拡張設定で他の画面と共通のキーを変更した場合に備えて、各画面を保存後の内容で更新する
+            bool extChanged = extPending.Count > 0;
+            if (extChanged)
+                LoadCurrentValues();
+            LoadExtendedSettings();
+            if (extChanged)
+                RenderCategory(selectedCategoryIndex);
+
             Debug.WriteLine("設定を保存しました");
             return true;
         }
