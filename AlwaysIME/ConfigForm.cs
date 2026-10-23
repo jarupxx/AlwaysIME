@@ -7,6 +7,7 @@ using System.Globalization;
 // カテゴリー一覧（左） + 選択カテゴリーの編集パネル（右）の
 // 2ペイン構成。リスト系設定はその場で追加・編集・削除・並べ替えができる。
 // ============================================================
+[System.ComponentModel.DesignerCategory("Code")]
 public class ConfigForm : Form
 {
     private class ConfigCategory
