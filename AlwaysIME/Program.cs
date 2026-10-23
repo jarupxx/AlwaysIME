@@ -1863,6 +1863,35 @@ class ResidentTest : Form
             Application.Exit();
         }
     }
+    // ダークモード用のトレイメニュー描画。
+    // 標準のレンダラーはセパレーターを背景色と無関係に明るい灰色で描画するため、
+    // 背景を塗りつぶしてからダーク向けの色で線を描画する。
+    private sealed class DarkMenuRenderer : ToolStripProfessionalRenderer
+    {
+        private static readonly Color MenuBackColor = Color.FromArgb(32, 32, 32);
+        private static readonly Color SeparatorColor = Color.FromArgb(96, 96, 96);
+
+        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+        {
+            Rectangle bounds = new Rectangle(Point.Empty, e.Item.Size);
+            using (var backBrush = new SolidBrush(MenuBackColor))
+            using (var linePen = new Pen(SeparatorColor))
+            {
+                e.Graphics.FillRectangle(backBrush, bounds);
+                if (e.Vertical)
+                {
+                    int x = bounds.Width / 2;
+                    e.Graphics.DrawLine(linePen, x, bounds.Top + 3, x, bounds.Bottom - 3);
+                }
+                else
+                {
+                    int y = bounds.Height / 2;
+                    e.Graphics.DrawLine(linePen, bounds.Left + 4, y, bounds.Right - 4, y);
+                }
+            }
+        }
+    }
+
     private void setComponents()
     {
         using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
@@ -1945,6 +1974,7 @@ class ResidentTest : Form
 
         if (darkModeEnabled)
         {
+            menu.Renderer = new DarkMenuRenderer();
             menuItemModeOn.BackColor = Color.FromArgb(32, 32, 32);
             menuItemModeOn.ForeColor = Color.White;
             menuItemModeOff.BackColor = Color.FromArgb(32, 32, 32);
@@ -1963,32 +1993,20 @@ class ResidentTest : Form
             suspendMenuItem.ForeColor = Color.White;
             resumeMenuItem.BackColor = Color.FromArgb(32, 32, 32);
             resumeMenuItem.ForeColor = Color.White;
-            separator1.BackColor = Color.FromArgb(32, 32, 32);
-            separator1.ForeColor = Color.White;
             updateModeMenuItem.BackColor = Color.FromArgb(32, 32, 32);
             updateModeMenuItem.ForeColor = Color.White;
-            separator2.BackColor = Color.FromArgb(32, 32, 32);
-            separator2.ForeColor = Color.White;
             updateTimeMenuItem.BackColor = Color.FromArgb(32, 32, 32);
             updateTimeMenuItem.ForeColor = Color.White;
-            separator3.BackColor = Color.FromArgb(32, 32, 32);
-            separator3.ForeColor = Color.White;
             MenuItemShowConfig.BackColor = Color.FromArgb(32, 32, 32);
             MenuItemShowConfig.ForeColor = Color.White;
             MenuItemRegistrationDialog.BackColor = Color.FromArgb(32, 32, 32);
             MenuItemRegistrationDialog.ForeColor = Color.White;
             MenuItemReload.BackColor = Color.FromArgb(32, 32, 32);
             MenuItemReload.ForeColor = Color.White;
-            separator4.BackColor = Color.FromArgb(32, 32, 32);
-            separator4.ForeColor = Color.White;
             menuPunctuation.BackColor = Color.FromArgb(32, 32, 32);
             menuPunctuation.ForeColor = Color.White;
-            separator5.BackColor = Color.FromArgb(32, 32, 32);
-            separator5.ForeColor = Color.White;
             menuSpace.BackColor = Color.FromArgb(32, 32, 32);
             menuSpace.ForeColor = Color.White;
-            separator6.BackColor = Color.FromArgb(32, 32, 32);
-            separator6.ForeColor = Color.White;
             menuItem.BackColor = Color.FromArgb(32, 32, 32);
             menuItem.ForeColor = Color.White;
         }
@@ -2001,35 +2019,28 @@ class ResidentTest : Form
         menu.Items.Add(suspendFewMenuItem);
         menu.Items.Add(suspendMenuItem);
         menu.Items.Add(resumeMenuItem);
-        if (!darkModeEnabled)
-            menu.Items.Add(separator1);
+        menu.Items.Add(separator1);
         menu.Items.Add(updateModeMenuItem);
         if (!AppExitEndEnabled)
         {
-            if (!darkModeEnabled)
-                menu.Items.Add(separator6);
+            menu.Items.Add(separator6);
             menu.Items.Add(menuItem);
         }
-        if (!darkModeEnabled)
-            menu.Items.Add(separator2);
+        menu.Items.Add(separator2);
         menu.Items.Add(updateTimeMenuItem);
-        if (!darkModeEnabled)
-            menu.Items.Add(separator3);
+        menu.Items.Add(separator3);
         menu.Items.Add(MenuItemShowConfig);
         menu.Items.Add(MenuItemRegistrationDialog);
         menu.Items.Add(MenuItemReload);
         // 表示/非表示は UpdateMsImeMenu() で切り替える
         // (設定画面から有効/無効を変更したときに再起動なしで反映するため)
-        if (!darkModeEnabled)
-            menu.Items.Add(separator4);
+        menu.Items.Add(separator4);
         menu.Items.Add(menuPunctuation);
-        if (!darkModeEnabled)
-            menu.Items.Add(separator5);
+        menu.Items.Add(separator5);
         menu.Items.Add(menuSpace);
         if (AppExitEndEnabled)
         {
-            if (!darkModeEnabled)
-                menu.Items.Add(separator6);
+            menu.Items.Add(separator6);
             menu.Items.Add(menuItem);
         }
         UpdateMsImeMenu();
