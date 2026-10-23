@@ -1,13 +1,5 @@
-using Microsoft.Win32;
-using System.Collections.Generic;
 using System.Configuration;
 using System.Diagnostics;
-using System.Globalization;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 // 設定ファイル（AlwaysIME.dll.config）の保存場所を管理する
