@@ -126,6 +126,8 @@ static class BackupService
     private const int MaxRestoreCandidates = 4;
 
     private static readonly Regex StableNameRegex = new Regex(@"^stable-(\d+)-(\d{14})\.config$", RegexOptions.Compiled);
+    private static readonly Regex PreRestoreNameRegex = new Regex(@"^pre-restore-(\d+)-(\d{14})\.config$", RegexOptions.Compiled);
+    private const int PreRestoreKeep = 3;
     private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions { WriteIndented = true };
 
     public sealed class BackupState
@@ -139,15 +141,40 @@ static class BackupService
         public double StableRunSeconds { get; set; }
         // 前回、正常に終了したか（初回は true）
         public bool CleanExit { get; set; } = true;
+        // 最後に割り当てた「復元前の設定」の連番
+        public long PreRestoreSeq { get; set; }
     }
 
-    private sealed class BackupEntry
+    public enum BackupKind
+    {
+        Latest,      // latest.config
+        Stable,      // stable-*.config
+        PreRestore,  // pre-restore-*.config（復元する直前の設定）
+    }
+
+    // 復元する範囲
+    public enum RestoreScope
+    {
+        All,         // すべての設定
+        ListsOnly,   // アプリ一覧・連携設定のみ
+        ExceptLists, // それ以外の設定のみ
+    }
+
+    public sealed class BackupEntry
     {
         public string FilePath;
-        public bool IsLatest;
-        public long Seq;
-        public DateTime SavedUtc;
+        public BackupKind Kind;
+        public long Seq;          // Latest は 0
+        public DateTime SavedUtc; // 表示用（新旧の判定には使わない）
     }
+
+    // 「アプリ一覧・連携設定」として扱うキー
+    private static readonly HashSet<string> ListSettingKeys = new HashSet<string>
+    {
+        "PassList", "ImeOffList", "ImeOffTitle", "UpdateTag",
+        "OnActivatedAppList", "OnActivatedAppPath", "OnActivatedArgv",
+        "BackgroundAppList", "BackgroundAppPath", "BackgroundArgv",
+    };
 
     private static readonly object gate = new object();
     private static string configPath;
@@ -239,6 +266,161 @@ static class BackupService
                 debounceTimer?.Dispose();
             }
             catch { }
+        }
+    }
+
+    // ---- 設定画面から使うAPI ----
+
+    public static string BackupDirectory
+    {
+        get
+        {
+            lock (gate)
+            {
+                return backupDir;
+            }
+        }
+    }
+
+    // 復元に使えるバックアップの一覧。
+    // 最新の設定 → 安定版（連番の新しい順） → 復元前の設定（連番の新しい順）
+    public static List<BackupEntry> GetBackups()
+    {
+        lock (gate)
+        {
+            var list = new List<BackupEntry>();
+            if (backupDir == null)
+            {
+                return list;
+            }
+            string latestPath = Path.Combine(backupDir, LatestFileName);
+            if (File.Exists(latestPath))
+            {
+                list.Add(new BackupEntry { FilePath = latestPath, Kind = BackupKind.Latest, SavedUtc = File.GetLastWriteTimeUtc(latestPath) });
+            }
+            list.AddRange(ListStables());
+            list.AddRange(ListPreRestores());
+            return list;
+        }
+    }
+
+    // 保存済みの設定を、安定の確認を待たずに安定版として保存する
+    public static bool BackupNow(out string message)
+    {
+        lock (gate)
+        {
+            message = "バックアップ機能を利用できません。";
+            if (!started || exited)
+            {
+                return false;
+            }
+            try
+            {
+                CheckConfigChange();
+                bool created = CreateStableBackup(out message);
+                if (created)
+                {
+                    state.CleanExit = false;
+                    SaveState();
+                }
+                return created;
+            }
+            catch (Exception ex)
+            {
+                message = "バックアップを作成できませんでした: " + ex.Message;
+                return false;
+            }
+        }
+    }
+
+    // バックアップから設定ファイルへ復元する。現在の設定は「復元前の設定」として残す。
+    // バックアップに無いキーは現在の値を保つ（古いバックアップで新しい項目が消えないようにするため）。
+    public static bool RestoreFrom(BackupEntry entry, RestoreScope scope, out string error)
+    {
+        lock (gate)
+        {
+            error = "バックアップ機能を利用できません。";
+            if (!started || exited)
+            {
+                return false;
+            }
+            try
+            {
+                if (!TryReadConfig(entry.FilePath, out byte[] backupBytes, out _))
+                {
+                    error = "選択したバックアップを読み込めません。";
+                    return false;
+                }
+                if (!TryReadConfig(configPath, out byte[] currentBytes, out _))
+                {
+                    error = "現在の設定ファイルを読み込めません。";
+                    return false;
+                }
+                XDocument backupDoc = XDocument.Load(new MemoryStream(backupBytes));
+                XDocument currentDoc = XDocument.Load(new MemoryStream(currentBytes));
+                XElement backupApp = backupDoc.Root.Element("appSettings");
+                if (backupApp == null)
+                {
+                    error = "バックアップに設定が含まれていません。";
+                    return false;
+                }
+                XElement currentApp = currentDoc.Root.Element("appSettings");
+                if (currentApp == null)
+                {
+                    currentApp = new XElement("appSettings");
+                    currentDoc.Root.Add(currentApp);
+                }
+
+                // 現在の設定を残してから書き換える（元に戻せるようにする）
+                List<BackupEntry> preRestores = ListPreRestores();
+                long preSeq = Math.Max(state.PreRestoreSeq, preRestores.Count > 0 ? preRestores[0].Seq : 0) + 1;
+                WriteAtomic(Path.Combine(backupDir, $"pre-restore-{preSeq:D6}-{DateTime.UtcNow:yyyyMMddHHmmss}.config"), currentBytes);
+                state.PreRestoreSeq = preSeq;
+                List<BackupEntry> allPre = ListPreRestores();
+                for (int i = PreRestoreKeep; i < allPre.Count; i++)
+                {
+                    try { File.Delete(allPre[i].FilePath); } catch { }
+                }
+
+                foreach (XElement add in backupApp.Elements("add"))
+                {
+                    string key = (string)add.Attribute("key");
+                    if (key == null)
+                    {
+                        continue;
+                    }
+                    bool isList = ListSettingKeys.Contains(key);
+                    if ((scope == RestoreScope.ListsOnly && !isList) || (scope == RestoreScope.ExceptLists && isList))
+                    {
+                        continue;
+                    }
+                    string value = (string)add.Attribute("value") ?? "";
+                    XElement target = currentApp.Elements("add").FirstOrDefault(e => (string)e.Attribute("key") == key);
+                    if (target != null)
+                    {
+                        target.SetAttributeValue("value", value);
+                    }
+                    else
+                    {
+                        currentApp.Add(new XElement("add", new XAttribute("key", key), new XAttribute("value", value)));
+                    }
+                }
+
+                string tempPath = configPath + ".tmp";
+                currentDoc.Save(tempPath);
+                File.Move(tempPath, configPath, overwrite: true);
+
+                // 変更を取り込み、安定の確認をやり直す
+                CheckConfigChange();
+                state.CleanExit = false;
+                SaveState();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
         }
     }
 
@@ -386,16 +568,30 @@ static class BackupService
         {
             return;
         }
-        if (!TryReadConfig(configPath, out byte[] bytes, out string hash) || hash != state.ConfigHash)
+        CreateStableBackup(out _);
+    }
+
+    // 現在の設定を安定版として保存する。作成した場合は true（しなかった理由は result に入る）
+    private static bool CreateStableBackup(out string result)
+    {
+        result = "";
+        if (!TryReadConfig(configPath, out byte[] bytes, out string hash))
         {
-            return;
+            result = "設定ファイルを読み込めないため、作成できませんでした。";
+            return false;
+        }
+        if (hash != state.ConfigHash)
+        {
+            result = "設定ファイルが変更されました。もう一度お試しください。";
+            return false;
         }
 
         List<BackupEntry> stables = ListStables();
         // 直近の安定版と同じ内容なら作らない
         if (stables.Count > 0 && TryReadConfig(stables[0].FilePath, out _, out string newestHash) && newestHash == hash)
         {
-            return;
+            result = "直近の安定版と同じ内容のため、作成しませんでした。";
+            return false;
         }
 
         long seq = Math.Max(state.StableSeq, stables.Count > 0 ? stables[0].Seq : 0) + 1;
@@ -418,6 +614,9 @@ static class BackupService
                 Trace.WriteLine("古いバックアップを削除できませんでした: " + ex.Message);
             }
         }
+
+        result = $"安定版 #{seq} を作成しました。";
+        return true;
     }
 
     private static double GetStableHours()
@@ -450,14 +649,21 @@ static class BackupService
     }
 
     // 安定版を連番の新しい順に返す
-    private static List<BackupEntry> ListStables()
+    private static List<BackupEntry> ListStables() =>
+        ListBackupFiles("stable-*.config", StableNameRegex, BackupKind.Stable);
+
+    // 復元前の設定を連番の新しい順に返す
+    private static List<BackupEntry> ListPreRestores() =>
+        ListBackupFiles("pre-restore-*.config", PreRestoreNameRegex, BackupKind.PreRestore);
+
+    private static List<BackupEntry> ListBackupFiles(string pattern, Regex regex, BackupKind kind)
     {
         var list = new List<BackupEntry>();
         try
         {
-            foreach (string file in Directory.EnumerateFiles(backupDir, "stable-*.config"))
+            foreach (string file in Directory.EnumerateFiles(backupDir, pattern))
             {
-                Match m = StableNameRegex.Match(Path.GetFileName(file));
+                Match m = regex.Match(Path.GetFileName(file));
                 if (!m.Success || !long.TryParse(m.Groups[1].Value, out long seq))
                 {
                     continue;
@@ -466,7 +672,7 @@ static class BackupService
                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out DateTime t)
                     ? t
                     : File.GetLastWriteTimeUtc(file);
-                list.Add(new BackupEntry { FilePath = file, Seq = seq, SavedUtc = saved });
+                list.Add(new BackupEntry { FilePath = file, Kind = kind, Seq = seq, SavedUtc = saved });
             }
         }
         catch (Exception ex)
@@ -511,7 +717,7 @@ static class BackupService
         string latestPath = Path.Combine(backupDir, LatestFileName);
         if (File.Exists(latestPath) && TryReadConfig(latestPath, out _, out _))
         {
-            candidates.Add(new BackupEntry { FilePath = latestPath, IsLatest = true, SavedUtc = File.GetLastWriteTimeUtc(latestPath) });
+            candidates.Add(new BackupEntry { FilePath = latestPath, Kind = BackupKind.Latest, SavedUtc = File.GetLastWriteTimeUtc(latestPath) });
         }
         foreach (BackupEntry stable in ListStables())
         {
@@ -537,7 +743,7 @@ static class BackupService
         var buttons = new List<(TaskDialogCommandLinkButton Button, BackupEntry Entry)>();
         foreach (BackupEntry entry in candidates)
         {
-            string title = entry.IsLatest ? "最新のバックアップから復元" : $"安定版（連番 {entry.Seq}）から復元";
+            string title = entry.Kind == BackupKind.Latest ? "最新のバックアップから復元" : $"安定版（連番 {entry.Seq}）から復元";
             string saved = $"保存: {entry.SavedUtc.ToLocalTime():yyyy/MM/dd HH:mm:ss}";
             var button = new TaskDialogCommandLinkButton(title, saved);
             page.Buttons.Add(button);
@@ -1022,18 +1228,18 @@ class ResidentTest : Form
         { "intervalTime", "200" },
         { "SuspendFewTime", "5" },
         { "SuspendTime", "45" },
-        { "NoKeyInputTime", "3" },
+        { "NoKeyInputTime", "0.1" },
         { "DelayBackgroundTime", "" },
-        { "Punctuation", "1,3" },
-        { "SpaceWidth", "1,2" },
+        { "Punctuation", "0,0" },
+        { "SpaceWidth", "0,0" },
         { "AppExitEnd", "1" },
         { "MsImeSwitch", "0" },
         { "KeyAssignment", "" },
         { "IsDarkMode", "off" },
-        { "PassList", "ShellExperienceHost" },
-        { "ImeOffList", "cmd,WindowsTerminal" },
+        { "PassList", "" },
+        { "ImeOffList", "" },
         { "ImeOffTitle", "" },
-        { "UpdateTag", "\\(?更新\\)?" },
+        { "UpdateTag", "" },
         { "OnActivatedAppList", "" },
         { "OnActivatedAppPath", "" },
         { "OnActivatedArgv", "" },
@@ -2045,6 +2251,13 @@ class ResidentTest : Form
             new ConfigCategory
             {
                 AppSettingKey = null,
+                Label = "バックアップ",
+                Desc = "設定ファイルのバックアップと復元を行います。\r\n保存先は設定ファイルと同じ場所の backup フォルダーです。\r\nバックアップの対象は保存済みの設定です。",
+                Type = "backup",
+            },
+            new ConfigCategory
+            {
+                AppSettingKey = null,
                 Label = "拡張設定",
                 Desc = "AlwaysIME.dll.config の全設定をここで変更できます。\r\n設定内容の詳細が分からないまま変更しないでください。\r\n「リセット」で初期値に戻せます（保存して閉じる／適用で反映）。",
                 Type = "extended",
@@ -2082,6 +2295,23 @@ class ResidentTest : Form
         private ComboBox cmbSpaceInit, cmbSpaceTo, cmbPunctInit, cmbPunctTo;
         private Control[] msimeControls;
 
+        // バックアップパネル
+        private static readonly double[] BackupHoursChoices = [1, 6, 12, 24, 48, 72];
+        private static readonly int[] BackupKeepChoices = [3, 5, 10, 20, 50];
+        private static readonly string[] RestoreScopeLabels = ["すべての設定", "アプリ一覧・連携設定のみ", "それ以外の設定のみ"];
+        // リンクの色（通常モード / ダークモードそれぞれの背景で読みやすい緑）
+        private static readonly Color BackupLinkColor = Color.FromArgb(26, 127, 55);
+        private static readonly Color BackupLinkColorDark = Color.FromArgb(63, 185, 80);
+        private ComboBox cmbBackupHours, cmbBackupKeep, cmbRestoreDate, cmbRestoreScope;
+        private readonly List<double> backupHoursValues = new List<double>();
+        private readonly List<int> backupKeepValues = new List<int>();
+        private List<BackupService.BackupEntry> backupChoices = new List<BackupService.BackupEntry>();
+        private LinkLabel linkBackupFolder, linkBackupNow;
+        private Label lblBackupLatest;
+        private Button btnRestore;
+        private Font backupItalicFont;
+        private Control[] backupControls;
+
         // 拡張設定パネル（キー / 値 / リセット）
         private const string ExtColKey = "colKey";
         private const string ExtColValue = "colValue";
@@ -2093,7 +2323,7 @@ class ResidentTest : Form
         // 拡張設定の各キーの説明（セルにマウスを合わせたときのポップアップ表示）
         private static readonly Dictionary<string, string> ConfigDescriptions = new Dictionary<string, string>
         {
-            { "AlwaysIMEMode", "IMEの制御モードです。\n1: IMEオン（常にオンにする）\n2: IMEオフ\n3: グローバル（直前のIME状態を維持する）。" },
+            { "AlwaysIMEMode", "IMEの制御モードです。\n1: IMEオン（常にオンにする）\n2: IMEオフ\n3: グローバル（直前のIME状態を維持する）\n※ on / off も指定できます（on=1、off=3）。" },
             { "IsDarkMode", "トレイメニューや設定画面をダークモードにします。\non: ダークモード / それ以外: 通常\n※ メニューへの反映は再起動後です。" },
             { "PassList", "IMEを一切操作しないアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: AlwaysIME,notepad" },
             { "ImeOffList", "アプリの切り替えやウィンドウタイトルの変化時に、IMEをオフにするアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: cmd,powershell" },
@@ -2102,7 +2332,7 @@ class ResidentTest : Form
             { "intervalTime", "IMEの状態を監視する間隔です（ミリ秒）。\n小さいほど反応が早くなりますが、負荷が増えます。\n例: 200" },
             { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。" },
             { "SuspendTime", "トレイメニュー「しばらく無効」で、機能を停止する時間です（分）。" },
-            { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
+            { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分で、小数も指定できます（0.1 = 6秒）。" },
             { "DelayBackgroundTime", "BackgroundAppList のアプリが非アクティブになってから、連携アプリ（BackgroundAppPath）を起動するまでの時間です（分）。\n空欄の場合は無効です。" },
             { "OnActivatedAppList", "アクティブになったときに連携アプリ（OnActivatedAppPath）を起動するアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。" },
             { "OnActivatedAppPath", "OnActivatedAppList のアプリがアクティブになったときに起動する連携アプリのパスです。\n存在しないパスを指定すると警告が表示されます。" },
@@ -2377,6 +2607,98 @@ class ResidentTest : Form
             extControls = new Control[] { extFilter, extGrid };
             this.Controls.AddRange(extControls);
 
+            // ---- バックアップパネル ----
+            int bkComboW = (int)(RW * 0.42);
+            int bkComboX = RX + RW - bkComboW;
+            int bkRow1 = panelTop + (int)(28 * uiScale);
+            int bkRow2 = panelTop + (int)(56 * uiScale);
+            int bkLblDy = (int)(4 * uiScale);
+            int bkLblW = RW - bkComboW - SP;
+
+            Label hdrAuto = new Label
+            {
+                Text = "自動バックアップ",
+                Location = new Point(RX, panelTop),
+                Size = new Size(RW, (int)(20 * uiScale)),
+                Font = extBoldFont,
+            };
+            Label lblBackupHours = MakeMsImeLabel("安定版の作成タイミング", RX, bkRow1 + bkLblDy, bkLblW, (int)(20 * uiScale));
+            cmbBackupHours = MakeMsImeCombo(Array.Empty<string>(), bkComboX, bkRow1, bkComboW);
+            Label lblBackupKeep = MakeMsImeLabel("バックアップの最大数", RX, bkRow2 + bkLblDy, bkLblW, (int)(20 * uiScale));
+            cmbBackupKeep = MakeMsImeCombo(Array.Empty<string>(), bkComboX, bkRow2, bkComboW);
+
+            Color backupLinkColor = darkModeEnabled ? BackupLinkColorDark : BackupLinkColor;
+            linkBackupFolder = new LinkLabel
+            {
+                Text = "バックアップフォルダーを表示📂",
+                Location = new Point(RX, panelTop + (int)(92 * uiScale)),
+                AutoSize = true,
+                LinkColor = backupLinkColor,
+                ActiveLinkColor = backupLinkColor,
+                VisitedLinkColor = backupLinkColor,
+                LinkBehavior = LinkBehavior.HoverUnderline,
+            };
+            linkBackupFolder.LinkClicked += (s, e) => OpenBackupFolder();
+
+            linkBackupNow = new LinkLabel
+            {
+                Text = "今すぐバックアップ💾",
+                Location = new Point(RX, panelTop + (int)(116 * uiScale)),
+                AutoSize = true,
+                LinkColor = backupLinkColor,
+                ActiveLinkColor = backupLinkColor,
+                VisitedLinkColor = backupLinkColor,
+                LinkBehavior = LinkBehavior.HoverUnderline,
+            };
+            linkBackupNow.LinkClicked += (s, e) => BackupNowClicked();
+
+            backupItalicFont = new Font(this.Font, FontStyle.Italic);
+            lblBackupLatest = new Label
+            {
+                Location = new Point(RX, panelTop + (int)(138 * uiScale)),
+                Size = new Size(RW, (int)(36 * uiScale)),
+                Font = backupItalicFont,
+            };
+
+            Label backupSeparator = new Label
+            {
+                BorderStyle = BorderStyle.Fixed3D,
+                Location = new Point(RX, panelTop + (int)(180 * uiScale)),
+                Size = new Size(RW, 2),
+            };
+
+            Label hdrRestore = new Label
+            {
+                Text = "バックアップの復元",
+                Location = new Point(RX, panelTop + (int)(190 * uiScale)),
+                Size = new Size(RW, (int)(20 * uiScale)),
+                Font = extBoldFont,
+            };
+            int restoreW = (int)(RW * 0.7);
+            cmbRestoreDate = MakeMsImeCombo(Array.Empty<string>(), RX, panelTop + (int)(216 * uiScale), restoreW);
+            cmbRestoreScope = MakeMsImeCombo(Array.Empty<string>(), RX, panelTop + (int)(244 * uiScale), restoreW);
+            cmbRestoreScope.Items.Add("復元オプションを選択");
+            cmbRestoreScope.Items.AddRange(RestoreScopeLabels);
+            cmbRestoreScope.SelectedIndex = 0;
+            btnRestore = new Button
+            {
+                Text = "復元する",
+                Enabled = false,
+                Location = new Point(RX, panelTop + (int)(274 * uiScale)),
+                Size = new Size(restoreW, (int)(26 * uiScale)),
+            };
+            cmbRestoreDate.SelectedIndexChanged += (s, e) => UpdateRestoreButton();
+            cmbRestoreScope.SelectedIndexChanged += (s, e) => UpdateRestoreButton();
+            btnRestore.Click += (s, e) => RestoreSelectedBackup();
+
+            backupControls = new Control[]
+            {
+                hdrAuto, lblBackupHours, cmbBackupHours, lblBackupKeep, cmbBackupKeep,
+                linkBackupFolder, linkBackupNow, lblBackupLatest, backupSeparator,
+                hdrRestore, cmbRestoreDate, cmbRestoreScope, btnRestore,
+            };
+            this.Controls.AddRange(backupControls);
+
             // ---- 下部ボタン ----
             int btnY = H - (int)(36 * uiScale);
             btnSave = new Button { Text = "保存して閉じる", Location = new Point(RX, btnY), Size = new Size((int)(120 * uiScale), (int)(28 * uiScale)) };
@@ -2403,6 +2725,9 @@ class ResidentTest : Form
                     }
                 }
             }
+
+            // バックアップ画面の補足の色（ダークモードの一括着色より後に設定する）
+            lblBackupLatest.ForeColor = Color.Gray;
         }
 
         private static Label MakeMsImeLabel(string text, int x, int y, int w, int h)
@@ -2442,6 +2767,7 @@ class ResidentTest : Form
                         : new List<string>();
                 }
             }
+            LoadBackupSettings();
             secondsCtrl.Value = Math.Max(secondsCtrl.Minimum, Math.Min(secondsCtrl.Maximum, noKeyInputInterval / 1000));
             chkAppExitEnd.Checked = AppExitEndEnabled;
             chkDarkMode.Checked = darkModeEnabled;
@@ -2492,10 +2818,149 @@ class ResidentTest : Form
             cmbPunctTo.SelectedIndex = punctTo;
         }
 
+        // ============================================================
+        // バックアップ（自動バックアップの設定 / 今すぐバックアップ / 復元）
+        // ============================================================
+
+        // 設定ファイルの値を、コンボボックスへ読み込む（一覧にない値は選択肢として追加する）
+        private void LoadBackupSettings()
+        {
+            double hours = 24;
+            if (double.TryParse(ConfigurationManager.AppSettings["BackupStableHours"], NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out double h) && h >= 0 && !double.IsInfinity(h))
+                hours = h;
+            var hoursList = new List<double>(BackupHoursChoices);
+            if (!hoursList.Contains(hours))
+            {
+                hoursList.Add(hours);
+                hoursList.Sort();
+            }
+            backupHoursValues.Clear();
+            cmbBackupHours.Items.Clear();
+            foreach (double v in hoursList)
+            {
+                backupHoursValues.Add(v);
+                cmbBackupHours.Items.Add(v == 0 ? "確認のたびに作成" : $"変更後 {v:0.##}時間動作したら");
+            }
+            cmbBackupHours.SelectedIndex = backupHoursValues.IndexOf(hours);
+
+            int keep = 5;
+            if (int.TryParse(ConfigurationManager.AppSettings["BackupKeep"], NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out int k))
+                keep = Math.Clamp(k, 1, 50);
+            var keepList = new List<int>(BackupKeepChoices);
+            if (!keepList.Contains(keep))
+            {
+                keepList.Add(keep);
+                keepList.Sort();
+            }
+            backupKeepValues.Clear();
+            cmbBackupKeep.Items.Clear();
+            foreach (int v in keepList)
+            {
+                backupKeepValues.Add(v);
+                cmbBackupKeep.Items.Add(v.ToString());
+            }
+            cmbBackupKeep.SelectedIndex = backupKeepValues.IndexOf(keep);
+        }
+
+        private static string DescribeBackup(BackupService.BackupEntry entry)
+        {
+            string date = entry.SavedUtc.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+            return entry.Kind switch
+            {
+                BackupService.BackupKind.Latest => $"最新の設定　{date}",
+                BackupService.BackupKind.Stable => $"安定版 #{entry.Seq}　{date}",
+                _ => $"復元前の設定 #{entry.Seq}　{date}",
+            };
+        }
+
+        // 最新のバックアップの表示と、復元できる一覧を更新する
+        private void RefreshBackupPanel()
+        {
+            backupChoices = BackupService.GetBackups();
+
+            cmbRestoreDate.Items.Clear();
+            cmbRestoreDate.Items.Add("日付を選択");
+            foreach (var entry in backupChoices)
+                cmbRestoreDate.Items.Add(DescribeBackup(entry));
+            cmbRestoreDate.SelectedIndex = 0;
+            cmbRestoreScope.SelectedIndex = 0;
+
+            var latest = backupChoices.FirstOrDefault(b => b.Kind == BackupService.BackupKind.Latest);
+            var stable = backupChoices.FirstOrDefault(b => b.Kind == BackupService.BackupKind.Stable);
+            lblBackupLatest.Text =
+                "最新のバックアップ: " + (latest != null ? latest.SavedUtc.ToLocalTime().ToString("yyyy年M月d日 HH:mm") : "なし") + "\r\n" +
+                "最新の安定版: " + (stable != null
+                    ? $"#{stable.Seq}（{stable.SavedUtc.ToLocalTime():yyyy年M月d日 HH:mm}）"
+                    : "なし");
+            UpdateRestoreButton();
+        }
+
+        private void UpdateRestoreButton()
+        {
+            btnRestore.Enabled = cmbRestoreDate.SelectedIndex > 0 && cmbRestoreScope.SelectedIndex > 0;
+        }
+
+        private void OpenBackupFolder()
+        {
+            string dir = BackupService.BackupDirectory;
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+            {
+                MessageBox.Show(this, "バックアップフォルダーがありません。", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            try
+            {
+                Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "フォルダーを開けませんでした。\n\n" + ex.Message, "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void BackupNowClicked()
+        {
+            BackupService.BackupNow(out string message);
+            RefreshBackupPanel();
+            MessageBox.Show(this, message, "バックアップ", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void RestoreSelectedBackup()
+        {
+            int dateIdx = cmbRestoreDate.SelectedIndex - 1;
+            int scopeIdx = cmbRestoreScope.SelectedIndex - 1;
+            if (dateIdx < 0 || dateIdx >= backupChoices.Count || scopeIdx < 0)
+                return;
+            BackupService.BackupEntry entry = backupChoices[dateIdx];
+            var scope = (BackupService.RestoreScope)scopeIdx;
+
+            string confirm = $"「{DescribeBackup(entry)}」から復元します。\n復元する範囲: {RestoreScopeLabels[scopeIdx]}\n\n" +
+                "現在の設定は「復元前の設定」として残します。\nこの画面で保存していない変更は失われます。\n\n復元しますか？";
+            if (MessageBox.Show(this, confirm, "バックアップの復元", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return;
+
+            if (!BackupService.RestoreFrom(entry, scope, out string error))
+            {
+                MessageBox.Show(this, "復元できませんでした。\n\n" + error, "バックアップの復元", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            // 復元した内容をアプリと各画面へ反映する
+            ConfigurationManager.RefreshSection("appSettings");
+            ApplyMsImeSettings();
+            LoadCurrentValues();
+            LoadExtendedSettings();
+            RenderCategory(selectedCategoryIndex);
+            MessageBox.Show(this, "復元しました。", "バックアップの復元", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
                 extBoldFont?.Dispose();
+                backupItalicFont?.Dispose();
             base.Dispose(disposing);
         }
 
@@ -2688,6 +3153,12 @@ class ResidentTest : Form
             foreach (Control c in extControls)
                 c.Visible = cat.Type == "extended";
 
+            bool isBackup = cat.Type == "backup";
+            foreach (Control c in backupControls)
+                c.Visible = isBackup;
+            if (isBackup)
+                RefreshBackupPanel();
+
             if (isList)
             {
                 editingIndex = -1;
@@ -2822,6 +3293,12 @@ class ResidentTest : Form
             SetAppSetting(config, "MsImeSwitch", chkMsImeSwitch.Checked ? "1" : "0");
             SetAppSetting(config, "SpaceWidth", $"{cmbSpaceInit.SelectedIndex},{cmbSpaceTo.SelectedIndex}");
             SetAppSetting(config, "Punctuation", $"{cmbPunctInit.SelectedIndex},{cmbPunctTo.SelectedIndex}");
+
+            // 自動バックアップの設定
+            if (cmbBackupHours.SelectedIndex >= 0)
+                SetAppSetting(config, "BackupStableHours", backupHoursValues[cmbBackupHours.SelectedIndex].ToString("0.####", CultureInfo.InvariantCulture));
+            if (cmbBackupKeep.SelectedIndex >= 0)
+                SetAppSetting(config, "BackupKeep", backupKeepValues[cmbBackupKeep.SelectedIndex].ToString(CultureInfo.InvariantCulture));
 
             // 拡張設定で変更(リセット含む)したキーを書き込む。他の画面と同じキーを両方で変更した場合は拡張設定を優先する
             extGrid.EndEdit();
