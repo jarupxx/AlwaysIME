@@ -113,6 +113,18 @@ public class ConfigForm : Form
     private CheckBox chkDarkMode;
     private Label advNote;
 
+    // ログ出力の設定（上級者向け設定パネルの下半分）
+    private static readonly string[] LogLevelLabels = ["情報以上（すべて記録）", "警告以上", "エラーのみ"];
+    private static readonly string[] LogLevelValues = ["info", "warn", "error"];
+    private static readonly int[] LogSizeChoices = [1, 2, 5, 10];
+    private static readonly int[] LogKeepChoices = [1, 3, 5, 10];
+    private readonly List<int> logSizeValues = new List<int>();
+    private readonly List<int> logKeepValues = new List<int>();
+    private CheckBox chkLogEnabled;
+    private ComboBox cmbLogLevel, cmbLogSize, cmbLogKeep;
+    private LinkLabel linkLogFolder;
+    private Control[] logControls;
+
     // MS-IME入力設定パネル
     private static readonly string[] InputSpaceLabels = ["現在の入力モード", "常に全角", "常に半角"];
     private static readonly string[] PunctuationLabels = ["「，．」", "「、。」", "「、．」", "「，。」"];
@@ -173,6 +185,10 @@ public class ConfigForm : Form
         { "AppExitEnd", "トレイメニューの「常駐の終了」の位置です。\n1: メニューの末尾に配置  0: 上部に配置\n※ 反映は再起動後です。" },
         { "BackupStableHours", "設定を変更してから、アプリがこの時間（単位: 時間）動作し続けたら、安定動作を確認できたとみなして「安定版バックアップ」を作成します。\n設定を試行錯誤している間は作成されません。\n0 を指定すると、確認のたびに作成します。" },
         { "BackupKeep", "保持する安定版バックアップの世代数です（1〜50）。\n超えた分は古いものから削除します。\n保存先: 設定ファイルと同じ場所の backup フォルダー" },
+        { "LogEnabled", "動作ログをファイルに出力するかどうかです。\n1: 出力する  0: 出力しない\n保存先: ポータブル=実行ファイルと同じフォルダーの logs / ユーザー別=%AppData%\\AlwaysIME\\logs\nウィンドウタイトルなど、作業内容が分かる情報は記録しません。" },
+        { "LogLevel", "記録するログのレベルです。\ninfo: 情報・警告・エラーをすべて記録\nwarn: 警告とエラーのみ\nerror: エラーのみ" },
+        { "LogMaxSizeMB", "ログ1ファイルの最大サイズです（MB、1〜100）。\n超えると新しいファイルに切り替えます。" },
+        { "LogKeep", "残しておく過去ログの数です（1〜20）。\n超えた分は古いものから削除します。" },
     };
     private Control[] extControls;
     private bool extLoading = false;
@@ -525,6 +541,64 @@ public class ConfigForm : Form
         };
         this.Controls.AddRange(backupControls);
 
+        // ---- 上級者向け設定パネル：ログ出力 ----
+        int lgSep = panelTop + (int)(64 * uiScale);
+        int lgHdr = panelTop + (int)(72 * uiScale);
+        int lgChk = panelTop + (int)(96 * uiScale);
+        int lgRow1 = panelTop + (int)(124 * uiScale);
+        int lgRow2 = panelTop + (int)(152 * uiScale);
+        int lgRow3 = panelTop + (int)(180 * uiScale);
+
+        Label logSeparator = new Label
+        {
+            BorderStyle = BorderStyle.Fixed3D,
+            Location = new Point(RX, lgSep),
+            Size = new Size(RW, 2),
+        };
+        Label hdrLog = new Label
+        {
+            Text = "ログ出力",
+            Location = new Point(RX, lgHdr),
+            Size = new Size(RW, (int)(20 * uiScale)),
+            Font = extBoldFont,
+        };
+        chkLogEnabled = new CheckBox
+        {
+            Text = "動作ログをファイルに出力する",
+            Location = new Point(RX, lgChk),
+            Size = new Size(RW, (int)(24 * uiScale)),
+        };
+        chkLogEnabled.CheckedChanged += (s, e) => UpdateLogControlsEnabled();
+        Label lblLogLevel = MakeMsImeLabel("記録するレベル", RX, lgRow1 + bkLblDy, bkLblW, (int)(20 * uiScale));
+        cmbLogLevel = MakeMsImeCombo(LogLevelLabels, bkComboX, lgRow1, bkComboW);
+        Label lblLogSize = MakeMsImeLabel("1ファイルの最大サイズ", RX, lgRow2 + bkLblDy, bkLblW, (int)(20 * uiScale));
+        cmbLogSize = MakeMsImeCombo(Array.Empty<string>(), bkComboX, lgRow2, bkComboW);
+        Label lblLogKeep = MakeMsImeLabel("残す過去ログの数", RX, lgRow3 + bkLblDy, bkLblW, (int)(20 * uiScale));
+        cmbLogKeep = MakeMsImeCombo(Array.Empty<string>(), bkComboX, lgRow3, bkComboW);
+
+        linkLogFolder = new LinkLabel
+        {
+            Text = "ログフォルダーを表示📂",
+            Location = new Point(RX, panelTop + (int)(212 * uiScale)),
+            AutoSize = true,
+            LinkColor = backupLinkColor,
+            ActiveLinkColor = backupLinkColor,
+            VisitedLinkColor = backupLinkColor,
+            LinkBehavior = LinkBehavior.HoverUnderline,
+        };
+        linkLogFolder.LinkClicked += (s, e) => OpenLogFolder();
+
+        // 注記は、ログ出力の設定の下に置く
+        advNote.Location = new Point(RX, panelTop + (int)(240 * uiScale));
+
+        logControls = new Control[]
+        {
+            logSeparator, hdrLog, chkLogEnabled,
+            lblLogLevel, cmbLogLevel, lblLogSize, cmbLogSize, lblLogKeep, cmbLogKeep,
+            linkLogFolder,
+        };
+        this.Controls.AddRange(logControls);
+
         // ---- 下部ボタン ----
         int btnY = H - (int)(36 * uiScale);
         btnSave = new Button { Text = "保存して閉じる", Location = new Point(RX, btnY), Size = new Size((int)(120 * uiScale), (int)(28 * uiScale)) };
@@ -594,6 +668,7 @@ public class ConfigForm : Form
             }
         }
         LoadBackupSettings();
+        LoadLogSettings();
         secondsCtrl.Value = Math.Max(secondsCtrl.Minimum, Math.Min(secondsCtrl.Maximum, ResidentTest.noKeyInputInterval / 1000));
         chkAppExitEnd.Checked = ResidentTest.AppExitEndEnabled;
         chkDarkMode.Checked = ResidentTest.darkModeEnabled;
@@ -688,6 +763,76 @@ public class ConfigForm : Form
             cmbBackupKeep.Items.Add(v.ToString());
         }
         cmbBackupKeep.SelectedIndex = backupKeepValues.IndexOf(keep);
+    }
+
+    // ログ出力の設定を、コントロールへ読み込む（一覧にない値は選択肢として追加する）
+    private void LoadLogSettings()
+    {
+        chkLogEnabled.Checked = AppLog.ParseEnabled(ConfigurationManager.AppSettings["LogEnabled"]);
+
+        string level = AppLog.ParseLevel(ConfigurationManager.AppSettings["LogLevel"]);
+        cmbLogLevel.SelectedIndex = Math.Max(0, Array.IndexOf(LogLevelValues, level));
+
+        int size = AppLog.ParseMaxSizeMB(ConfigurationManager.AppSettings["LogMaxSizeMB"]);
+        var sizeList = new List<int>(LogSizeChoices);
+        if (!sizeList.Contains(size))
+        {
+            sizeList.Add(size);
+            sizeList.Sort();
+        }
+        logSizeValues.Clear();
+        cmbLogSize.Items.Clear();
+        foreach (int v in sizeList)
+        {
+            logSizeValues.Add(v);
+            cmbLogSize.Items.Add($"{v} MB");
+        }
+        cmbLogSize.SelectedIndex = logSizeValues.IndexOf(size);
+
+        int keep = AppLog.ParseKeep(ConfigurationManager.AppSettings["LogKeep"]);
+        var keepList = new List<int>(LogKeepChoices);
+        if (!keepList.Contains(keep))
+        {
+            keepList.Add(keep);
+            keepList.Sort();
+        }
+        logKeepValues.Clear();
+        cmbLogKeep.Items.Clear();
+        foreach (int v in keepList)
+        {
+            logKeepValues.Add(v);
+            cmbLogKeep.Items.Add($"{v} 個");
+        }
+        cmbLogKeep.SelectedIndex = logKeepValues.IndexOf(keep);
+
+        UpdateLogControlsEnabled();
+    }
+
+    // ログ出力を行わない設定のときは、詳細な設定を操作できないようにする
+    private void UpdateLogControlsEnabled()
+    {
+        bool on = chkLogEnabled.Checked;
+        cmbLogLevel.Enabled = on;
+        cmbLogSize.Enabled = on;
+        cmbLogKeep.Enabled = on;
+    }
+
+    private void OpenLogFolder()
+    {
+        string dir = AppLog.LogDirectory;
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+        {
+            MessageBox.Show(this, "ログフォルダーがありません。", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "フォルダーを開けませんでした。\n\n" + ex.Message, "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private static string DescribeBackup(BackupService.BackupEntry entry)
@@ -972,6 +1117,8 @@ public class ConfigForm : Form
         chkAppExitEnd.Visible = isAdvanced;
         chkDarkMode.Visible = isAdvanced;
         advNote.Visible = isAdvanced;
+        foreach (Control c in logControls)
+            c.Visible = isAdvanced;
 
         foreach (Control c in msimeControls)
             c.Visible = isMsIme;
@@ -1126,6 +1273,15 @@ public class ConfigForm : Form
         if (cmbBackupKeep.SelectedIndex >= 0)
             SetAppSetting(config, "BackupKeep", backupKeepValues[cmbBackupKeep.SelectedIndex].ToString(CultureInfo.InvariantCulture));
 
+        // ログ出力の設定
+        SetAppSetting(config, "LogEnabled", chkLogEnabled.Checked ? "1" : "0");
+        if (cmbLogLevel.SelectedIndex >= 0)
+            SetAppSetting(config, "LogLevel", LogLevelValues[cmbLogLevel.SelectedIndex]);
+        if (cmbLogSize.SelectedIndex >= 0)
+            SetAppSetting(config, "LogMaxSizeMB", logSizeValues[cmbLogSize.SelectedIndex].ToString(CultureInfo.InvariantCulture));
+        if (cmbLogKeep.SelectedIndex >= 0)
+            SetAppSetting(config, "LogKeep", logKeepValues[cmbLogKeep.SelectedIndex].ToString(CultureInfo.InvariantCulture));
+
         // 拡張設定で変更(リセット含む)したキーを書き込む。他の画面と同じキーを両方で変更した場合は拡張設定を優先する
         extGrid.EndEdit();
         foreach (var kv in extPending)
@@ -1133,6 +1289,9 @@ public class ConfigForm : Form
 
         config.Save(ConfigurationSaveMode.Modified);
         ConfigurationManager.RefreshSection("appSettings");
+
+        // ログの設定を即時反映する
+        AppLog.ReloadSettings();
 
         // レジストリとトレイメニューへ即時反映する
         ResidentTest.ApplyMsImeSettings();

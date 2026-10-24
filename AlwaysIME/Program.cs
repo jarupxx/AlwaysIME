@@ -28,16 +28,25 @@ class MainWindow
 
         if (createdNew)
         {
+            // フォームを作る前に、未処理例外の記録を有効にする
+            GlobalExceptionHandler.Install();
+            AppLog.LogStartup();
             ApplicationConfiguration.Initialize();
             // 設定ファイルの場所を決定する（ConfigurationManagerを最初に使う前に行う必要がある）
             if (!ConfigStore.Initialize())
             {
+                AppLog.EnsureLocation();
+                AppLog.Warn("設定ファイルの場所を決定できなかったため、起動を中止します");
                 mutex.ReleaseMutex();
                 return;
             }
+            // ログの保存先を、設定ファイルと同じ方式（ポータブル / ユーザー別）で確定する
+            AppLog.Configure(ConfigStore.IsPortable);
+            AppLog.Info($"設定ファイル: {ConfigStore.FilePath}（{(ConfigStore.IsPortable ? "ポータブル" : "ユーザー別")}）");
             // 設定の検証・復元と、バックアップ監視の開始
             if (!BackupService.OnStartup())
             {
+                AppLog.Warn("設定の検証・復元ができなかったため、起動を中止します");
                 mutex.ReleaseMutex();
                 return;
             }
@@ -45,6 +54,7 @@ class MainWindow
             ResidentTest rm = new ResidentTest();
             WatchForRestartSignal();
             Application.Run();
+            AppLog.Info("終了します");
             BackupService.OnExit();
             restartSignalRegisteredWait?.Unregister(null);
             restartSignalEvent?.Dispose();
@@ -53,15 +63,19 @@ class MainWindow
         else
         {
             // すでに起動しているインスタンスがある場合は、再起動シグナルを送信
+            // （ログの設定を読めるよう、既存の設定ファイルの場所を使う）
+            ConfigStore.TryActivateExisting();
+            AppLog.EnsureLocation();
             try
             {
                 using EventWaitHandle signalEvent = EventWaitHandle.OpenExisting(RestartSignalEventName);
                 signalEvent.Set();
+                AppLog.Info("起動中のインスタンスへ再起動シグナルを送信しました");
             }
             catch (WaitHandleCannotBeOpenedException)
             {
                 // 既存インスタンスがまだイベントを作成していない場合は何もできない
-                Trace.WriteLine("再起動シグナル用イベントが見つかりません。");
+                AppLog.Warn("再起動シグナル用イベントが見つかりません。");
             }
         }
     }
@@ -87,6 +101,7 @@ class MainWindow
 
     static void RestartApplication()
     {
+        AppLog.Info("再起動します");
         // 新しいプロセスを起動する前に、終了時のバックアップを済ませておく
         BackupService.OnExit();
         string exePath = Process.GetCurrentProcess().MainModule.FileName;
@@ -301,6 +316,10 @@ class ResidentTest : Form
         { "BackgroundArgv", "" },
         { "BackupStableHours", "24" },
         { "BackupKeep", "5" },
+        { "LogEnabled", "1" },
+        { "LogLevel", "info" },
+        { "LogMaxSizeMB", "1" },
+        { "LogKeep", "3" },
     };
 
     // 設定値が不正な場合に確認ダイアログを表示する。
@@ -460,6 +479,8 @@ class ResidentTest : Form
         try
         {
             InitializeAppConfigCore();
+            // ログの設定（出力の有無、レベル、サイズ）を反映する
+            AppLog.ReloadSettings();
         }
         catch (ConfigReloadRequestedException)
         {
@@ -700,7 +721,7 @@ class ResidentTest : Form
                 }
                 else
                 {
-                    Trace.WriteLine("Failed to write registory.");
+                    AppLog.Warn("Failed to write registory.");
                 }
             }
         }
@@ -734,7 +755,7 @@ class ResidentTest : Form
                 }
                 else
                 {
-                    Trace.WriteLine("Failed to write registory.");
+                    AppLog.Warn("Failed to write registory.");
                 }
             }
         }
@@ -808,7 +829,7 @@ class ResidentTest : Form
         }
         catch (Exception ex)
         {
-            Trace.WriteLine($"ReadMsImeDword({name}) failed: {ex.Message}");
+            AppLog.Warn($"ReadMsImeDword({name}) failed", ex);
             return null;
         }
     }
@@ -838,7 +859,7 @@ class ResidentTest : Form
         }
         else
         {
-            Trace.WriteLine("Failed to write registory.");
+            AppLog.Warn("Failed to write registory.");
         }
     }
 
@@ -1310,7 +1331,7 @@ class ResidentTest : Form
         }
         else
         {
-            Trace.WriteLine("Failed to write registory.");
+            AppLog.Warn("Failed to write registory.");
         }
     }
     private void Space_Click(object sender, EventArgs e)
@@ -1347,14 +1368,14 @@ class ResidentTest : Form
         }
         else
         {
-            Trace.WriteLine("Failed to write registory.");
+            AppLog.Warn("Failed to write registory.");
         }
     }
     private void ResumeMenuItem_Click(object sender, EventArgs e)
     {
         this.timer.Start();
         SetIcon(ICON_GREEN);
-        Trace.WriteLine("クリックにより再開しました");
+        AppLog.Info("クリックにより再開しました");
     }
     private async void SuspendFewMenuItem_Click(object sender, EventArgs e)
     {
@@ -1368,14 +1389,14 @@ class ResidentTest : Form
     private async Task SuspendAsync(TimeSpan duration)
     {
         SetIcon(ICON_GRAY);
-        Trace.WriteLine($"{duration.TotalMinutes}分間無効にします({DateTime.Now + duration}まで)");
+        AppLog.Info($"{duration.TotalMinutes}分間無効にします({DateTime.Now + duration}まで)");
 
         this.timer.Stop();
         await Task.Delay(duration);
         this.timer.Start();
 
         SetIcon(ICON_GREEN);
-        Trace.WriteLine("再開しました");
+        AppLog.Info("再開しました");
     }
     private void ChangeAlwaysIMEModeAndSave(int mode)
     {
@@ -1549,7 +1570,7 @@ class ResidentTest : Form
             }
             else
             {
-                Trace.WriteLine("IMEが有効になりません");
+                AppLog.Warn("IMEが有効になりません");
                 changeIme = false;
             }
         }
@@ -1564,7 +1585,7 @@ class ResidentTest : Form
             }
             else
             {
-                Trace.WriteLine("IMEが無効になりません");
+                AppLog.Warn("IMEが無効になりません");
                 changeIme = false;
             }
         }
@@ -1582,7 +1603,7 @@ class ResidentTest : Form
         }
         else
         {
-            Trace.WriteLine("SetImeOffList：IMEが無効になりません");
+            AppLog.Warn("SetImeOffList：IMEが無効になりません");
             changeIme = false;
         }
     }
@@ -1597,7 +1618,7 @@ class ResidentTest : Form
         }
         else
         {
-            Trace.WriteLine("IMEが有効になりません");
+            AppLog.Warn("IMEが有効になりません");
             changeIme = false;
         }
     }
@@ -1609,7 +1630,7 @@ class ResidentTest : Form
             {
                 if (!flagOnActivated)
                 {
-                    Trace.WriteLine($"{foregroundprocessName} により連携アプリが起動します");
+                    AppLog.Info("連携アプリを起動します: " + Path.GetFileName(RunOnActivatedAppPath));
                     Process.Start(RunOnActivatedAppPath, RunOnActivatedArgv);
                     flagOnActivated = true;
                     SetIcon(ICON_RED);
@@ -1619,7 +1640,8 @@ class ResidentTest : Form
     }
     private void MonitorBackground(int param)
     {
-        Trace.WriteLine($"{previousprocessName},{foregroundprocessName}");
+        // 利用状況が分かる情報のため、ファイルログには出さない（デバッガー専用）
+        Debug.WriteLine($"{previousprocessName},{foregroundprocessName}");
         // 非アクティブになってから指定回数ループで解除する
         if (List[param] != null)
         {
@@ -1689,7 +1711,7 @@ class ResidentTest : Form
 
         if (!GetGUIThreadInfo(0, ref gti))
         {
-            Trace.WriteLine("GetGUIThreadInfo failed");
+            AppLog.Warn("GetGUIThreadInfo failed");
             // スタートアップやロック解除時に例外0x80004005が発生する
             //throw new System.ComponentModel.Win32Exception();
             return;
@@ -1704,7 +1726,7 @@ class ResidentTest : Form
         Debug.WriteLine($"{imeEnabled} status code:{imeConvMode}");
         if (!imeEnabled & imeConvMode == IME_CMODE_DISABLED)
         {
-            Trace.WriteLine("IMEが無効です");
+            AppLog.Info("IMEが無効です");
             changeIme = false;
             SetIcon(ICON_GREEN);
             return;
@@ -1746,32 +1768,33 @@ class ResidentTest : Form
                         else
                         {
                             foregroundWindowTitle = "";
-                            Trace.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+                            // ウィンドウタイトルやプロセス名はファイルログには出さない（デバッガー専用）
+                            Debug.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
                             /* タイトルが空欄のプロセスが存在するので後でreturn;をする */
                             // return;
                         }
                     }
                     catch (Exception ex)
                     {
-                        Trace.WriteLine("GetProcessById Failed: " + ex.Message);
+                        AppLog.Warn("GetProcessById Failed", ex);
                         return;
                     }
                 }
                 else
                 {
-                    Trace.WriteLine("GetWindowThreadProcessId Failed");
+                    AppLog.Warn("GetWindowThreadProcessId Failed");
                     return;
                 }
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("Getting window information Failed: " + ex.Message);
+                AppLog.Warn("Getting window information Failed", ex);
                 return;
             }
         }
         else
         {
-            Trace.WriteLine("GetForegroundWindow Failed");
+            AppLog.Warn("GetForegroundWindow Failed");
             return;
         }
 

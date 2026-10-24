@@ -107,7 +107,7 @@ static class BackupService
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("バックアップフォルダーを作成できませんでした: " + ex.Message);
+                AppLog.Warn("バックアップフォルダーを作成できませんでした", ex);
                 return true;
             }
 
@@ -163,7 +163,7 @@ static class BackupService
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("終了時のバックアップに失敗しました: " + ex.Message);
+                AppLog.Warn("終了時のバックアップに失敗しました", ex);
             }
             try
             {
@@ -285,7 +285,7 @@ static class BackupService
                 List<BackupEntry> allPre = ListPreRestores();
                 for (int i = PreRestoreKeep; i < allPre.Count; i++)
                 {
-                    try { File.Delete(allPre[i].FilePath); } catch { }
+                    try { File.Delete(allPre[i].FilePath); } catch (Exception logEx) { AppLog.Warn("古い復元前バックアップを削除できませんでした", logEx); }
                 }
 
                 foreach (XElement add in backupApp.Elements("add"))
@@ -355,7 +355,7 @@ static class BackupService
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("設定ファイルの監視を開始できませんでした: " + ex.Message);
+            AppLog.Warn("設定ファイルの監視を開始できませんでした", ex);
         }
     }
 
@@ -386,7 +386,7 @@ static class BackupService
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("バックアップの定期確認に失敗しました: " + ex.Message);
+                AppLog.Warn("バックアップの定期確認に失敗しました", ex);
             }
         }
     }
@@ -407,7 +407,7 @@ static class BackupService
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("設定変更の確認に失敗しました: " + ex.Message);
+                AppLog.Warn("設定変更の確認に失敗しました", ex);
             }
         }
     }
@@ -463,7 +463,7 @@ static class BackupService
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("latest の更新に失敗しました: " + ex.Message);
+            AppLog.Warn("latest の更新に失敗しました", ex);
         }
     }
 
@@ -504,7 +504,7 @@ static class BackupService
         string name = $"stable-{seq:D6}-{DateTime.UtcNow:yyyyMMddHHmmss}.config";
         WriteAtomic(Path.Combine(backupDir, name), bytes);
         state.StableSeq = seq;
-        Trace.WriteLine("安定版バックアップを作成しました: " + name);
+        AppLog.Info("安定版バックアップを作成しました: " + name);
 
         // 古い世代を削除する
         int keep = GetKeepCount();
@@ -517,7 +517,7 @@ static class BackupService
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("古いバックアップを削除できませんでした: " + ex.Message);
+                AppLog.Warn("古いバックアップを削除できませんでした", ex);
             }
         }
 
@@ -536,7 +536,10 @@ static class BackupService
                 return v;
             }
         }
-        catch { }
+        catch (Exception logEx)
+        {
+            AppLog.Warn("BackupStableHoursを読み込めませんでした。既定値を使用します", logEx);
+        }
         return DefaultStableHours;
     }
 
@@ -550,7 +553,10 @@ static class BackupService
                 return Math.Clamp(v, 1, 50);
             }
         }
-        catch { }
+        catch (Exception logEx)
+        {
+            AppLog.Warn("BackupKeepを読み込めませんでした。既定値を使用します", logEx);
+        }
         return DefaultKeep;
     }
 
@@ -583,7 +589,7 @@ static class BackupService
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("バックアップ一覧を取得できませんでした: " + ex.Message);
+            AppLog.Warn("バックアップ一覧を取得できませんでした", ex);
         }
         list.Sort((a, b) => b.Seq.CompareTo(a.Seq));
         return list;
@@ -607,11 +613,11 @@ static class BackupService
             WriteAtomic(Path.Combine(backupDir, name), bytes);
             state.StableSeq = 1;
             File.Delete(legacyPath);
-            Trace.WriteLine("旧バックアップを引き継ぎました: " + name);
+            AppLog.Info("旧バックアップを引き継ぎました: " + name);
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("旧バックアップの引き継ぎに失敗しました: " + ex.Message);
+            AppLog.Warn("旧バックアップの引き継ぎに失敗しました", ex);
         }
     }
 
@@ -681,6 +687,7 @@ static class BackupService
         }
         catch (Exception ex)
         {
+            AppLog.Error("設定ファイルを復元できませんでした", ex);
             MessageBox.Show("設定ファイルを復元できませんでした。\n\n" + ex.Message, "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         return false;
@@ -745,7 +752,7 @@ static class BackupService
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("バックアップの状態を読み込めませんでした: " + ex.Message);
+            AppLog.Warn("バックアップの状態を読み込めませんでした", ex);
         }
         return new BackupState();
     }
@@ -759,7 +766,7 @@ static class BackupService
         }
         catch (Exception ex)
         {
-            Trace.WriteLine("バックアップの状態を保存できませんでした: " + ex.Message);
+            AppLog.Warn("バックアップの状態を保存できませんでした", ex);
         }
     }
 }
