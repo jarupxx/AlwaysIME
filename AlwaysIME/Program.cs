@@ -53,6 +53,8 @@ class MainWindow
             ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
             WatchForRestartSignal();
+            // 実行ファイルを移動していた場合に、自動起動の登録を新しい場所へ更新する（起動を遅らせないよう別スレッドで行う）
+            Task.Run(AutoStart.VerifyRegisteredPath);
             Application.Run();
             AppLog.Info("終了します");
             BackupService.OnExit();
