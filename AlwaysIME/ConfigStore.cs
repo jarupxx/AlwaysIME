@@ -1,5 +1,4 @@
 using System.Configuration;
-using System.Diagnostics;
 using System.Xml.Linq;
 
 // 設定ファイル（AlwaysIME.dll.config）の保存場所を管理する
@@ -13,6 +12,7 @@ static class ConfigStore
     // 配布物に含める初期設定のひな形（無ければ既定値から生成する）
     public const string TemplateFileName = "AlwaysIME.dll.config.default";
     private const string UserFolderName = "AlwaysIME";
+    private const string LogFolderName = "logs";
 
     public static string FilePath { get; private set; }
     public static bool IsPortable { get; private set; }
@@ -20,6 +20,41 @@ static class ConfigStore
     private static string PortableDirectory => AppContext.BaseDirectory;
     private static string UserDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), UserFolderName);
+
+    // ログの保存先。設定ファイルと同じ方式で決まる。
+    //  ポータブル  : 実行ファイルと同じフォルダー\logs
+    //  ユーザー別  : %AppData%\AlwaysIME\logs
+    public static string GetLogDirectory(bool portable) =>
+        Path.Combine(portable ? PortableDirectory : UserDirectory, LogFolderName);
+
+    // 既存の設定ファイルの場所を、確認ダイアログなしで調べる。ポータブル=true、ユーザー別=false、どちらも無い=null。
+    public static bool? PeekIsPortable()
+    {
+        if (File.Exists(Path.Combine(PortableDirectory, FileName)))
+        {
+            return true;
+        }
+        if (File.Exists(Path.Combine(UserDirectory, FileName)))
+        {
+            return false;
+        }
+        return null;
+    }
+
+    // 既存の設定ファイルがあれば、ConfigurationManagerがそれを読むようにする（確認ダイアログは出さない）。
+    // 2つ目のインスタンスが、ログの設定を読むために使う。ConfigurationManagerを最初に使う前に呼ぶこと。
+    public static bool TryActivateExisting()
+    {
+        bool? portable = PeekIsPortable();
+        if (portable == null)
+        {
+            return false;
+        }
+        IsPortable = portable.Value;
+        FilePath = Path.Combine(IsPortable ? PortableDirectory : UserDirectory, FileName);
+        AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", FilePath);
+        return true;
+    }
 
     // 保存場所を決定して、ConfigurationManagerがそのファイルを読むようにする。
     // ConfigurationManagerを最初に使う前に呼ぶこと。falseの場合はアプリを終了する。
@@ -43,6 +78,7 @@ static class ConfigStore
             bool? portable = AskStorageMode();
             if (portable == null)
             {
+                AppLog.Info("保存場所の選択がキャンセルされたため、起動を中止します");
                 return false;
             }
             IsPortable = portable.Value;
@@ -53,6 +89,7 @@ static class ConfigStore
             }
             catch (Exception ex)
             {
+                AppLog.Error("設定ファイルを作成できませんでした: " + FilePath, ex);
                 MessageBox.Show($"設定ファイルを作成できませんでした。\n\n場所: {FilePath}\n{ex.Message}", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
@@ -73,10 +110,12 @@ static class ConfigStore
             {
                 return true;
             }
+            AppLog.Error($"設定ファイルの場所を切り替えられませんでした。想定: {FilePath} / 実際: {actual}");
             MessageBox.Show($"設定ファイルの場所を切り替えられませんでした。\n\n想定: {FilePath}\n実際: {actual}", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         catch (Exception ex)
         {
+            AppLog.Error("設定ファイルを開けませんでした: " + FilePath, ex);
             MessageBox.Show($"設定ファイルを開けませんでした。\n\n場所: {FilePath}\n{ex.Message}", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         return false;
@@ -153,7 +192,7 @@ static class ConfigStore
             }
             catch (Exception ex)
             {
-                Trace.WriteLine("ひな形を読み込めませんでした: " + ex.Message);
+                AppLog.Warn("ひな形を読み込めませんでした", ex);
             }
         }
         doc ??= new XDocument(new XDeclaration("1.0", "utf-8", null));
