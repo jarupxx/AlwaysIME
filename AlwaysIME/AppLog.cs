@@ -180,7 +180,7 @@ static class AppLog
                     return;
                 }
             }
-            Configure(ConfigStore.PeekIsPortable() ?? false);
+            Configure(ConfigStore.PeekIsPortable() ?? ConfigStore.HasPortableMarker);
         }
         catch
         {

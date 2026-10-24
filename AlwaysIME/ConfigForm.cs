@@ -176,7 +176,7 @@ public class ConfigForm : Form
     // 拡張設定の各キーの説明（セルにマウスを合わせたときのポップアップ表示）
     private static readonly Dictionary<string, string> ConfigDescriptions = new Dictionary<string, string>
     {
-        { "AlwaysIMEMode", "IMEの制御モードです。\n1: IMEオン（常にオンにする）\n2: IMEオフ\n3: グローバル（直前のIME状態を維持する）\n※ on / off も指定できます（on=1、off=3）。" },
+        { "AlwaysIMEMode", "IMEの制御モードです。\n1: IMEオン（常にオンにする）\n2: IMEオフ\n3: グローバル（直前のIME状態を維持する）" },
         { "IsDarkMode", "トレイメニューや設定画面をダークモードにします。\non: ダークモード / それ以外: 通常\n※ メニューへの反映は再起動後です。" },
         { "PassList", "IMEを一切操作しないアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: AlwaysIME,notepad" },
         { "ImeOffList", "アプリの切り替えやウィンドウタイトルの変化時に、IMEをオフにするアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: cmd,powershell" },
@@ -185,7 +185,7 @@ public class ConfigForm : Form
         { "intervalTime", "IMEの状態を監視する間隔です（ミリ秒）。\n小さいほど反応が早くなりますが、負荷が増えます。\n例: 200" },
         { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。" },
         { "SuspendTime", "トレイメニュー「しばらく無効」で、機能を停止する時間です（分）。" },
-        { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分で、小数も指定できます（0.1 = 6秒）。" },
+        { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
         { "DelayBackgroundTime", "BackgroundAppList のアプリが非アクティブになってから、連携アプリ（BackgroundAppPath）を起動するまでの時間です（分）。\n空欄の場合は無効です。" },
         { "OnActivatedAppList", "アクティブになったときに連携アプリ（OnActivatedAppPath）を起動するアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。" },
         { "OnActivatedAppPath", "OnActivatedAppList のアプリがアクティブになったときに起動する連携アプリのパスです。\n存在しないパスを指定すると警告が表示されます。" },

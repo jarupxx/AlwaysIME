@@ -4,13 +4,18 @@ using System.Xml.Linq;
 // 設定ファイル（AlwaysIME.dll.config）の保存場所を管理する
 //  ポータブル  : 実行ファイルと同じフォルダー
 //  ユーザー別  : %AppData%\AlwaysIME
-// 実行フォルダーに設定ファイルがあればポータブル、無くてユーザー別にあればユーザー別とする。
-// どちらにも無い初回起動時だけ、保存場所を確認する。
+// 決め方（利用者への確認はしない）:
+//  1. 実行フォルダーに設定ファイルがあれば、ポータブル
+//  2. 無くて、ユーザー別の場所にあれば、ユーザー別
+//  3. どちらにも無い初回起動では、実行フォルダーにマーカーファイル（AlwaysIME.portable）があればポータブル、
+//     無ければユーザー別で作る
 static class ConfigStore
 {
     public const string FileName = "AlwaysIME.dll.config";
     // 配布物に含める初期設定のひな形（無ければ既定値から生成する）
     public const string TemplateFileName = "AlwaysIME.dll.config.default";
+    // 初回起動時に、このファイルが実行ファイルと同じフォルダーにあれば、ポータブルとして設定ファイルを作る（中身は問わない）
+    public const string PortableMarkerFileName = "AlwaysIME.portable";
     private const string UserFolderName = "AlwaysIME";
     private const string LogFolderName = "logs";
 
@@ -20,6 +25,9 @@ static class ConfigStore
     private static string PortableDirectory => AppContext.BaseDirectory;
     private static string UserDirectory =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), UserFolderName);
+
+    public static bool HasPortableMarker =>
+        File.Exists(Path.Combine(PortableDirectory, PortableMarkerFileName));
 
     // ログの保存先。設定ファイルと同じ方式で決まる。
     //  ポータブル  : 実行ファイルと同じフォルダー\logs
@@ -62,27 +70,27 @@ static class ConfigStore
     {
         string portablePath = Path.Combine(PortableDirectory, FileName);
         string userPath = Path.Combine(UserDirectory, FileName);
+        bool portableExists = File.Exists(portablePath);
+        bool userExists = File.Exists(userPath);
+        bool firstRun = !portableExists && !userExists;
+        bool markerExists = HasPortableMarker;
+        // 書き込めるかの確認（一時ファイルを作る）は、マーカーで保存場所を決める初回だけ行う
+        bool portableWritable = firstRun && markerExists && CanWriteDirectory(PortableDirectory);
 
-        if (File.Exists(portablePath))
+        var decision = DecideLocation(portableExists, userExists, markerExists, portableWritable);
+        IsPortable = decision.Portable;
+        FilePath = IsPortable ? portablePath : userPath;
+        if (decision.Warn)
         {
-            FilePath = portablePath;
-            IsPortable = true;
-        }
-        else if (File.Exists(userPath))
-        {
-            FilePath = userPath;
-            IsPortable = false;
+            AppLog.Warn(decision.Reason);
         }
         else
         {
-            bool? portable = AskStorageMode();
-            if (portable == null)
-            {
-                AppLog.Info("保存場所の選択がキャンセルされたため、起動を中止します");
-                return false;
-            }
-            IsPortable = portable.Value;
-            FilePath = IsPortable ? portablePath : userPath;
+            AppLog.Info(decision.Reason);
+        }
+
+        if (firstRun)
+        {
             try
             {
                 CreateInitialConfigFile(FilePath);
@@ -98,6 +106,32 @@ static class ConfigStore
         // System.Configurationが読み書きするファイルを切り替える
         AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", FilePath);
         return VerifyConfigurationManagerPath();
+    }
+
+    // 設定ファイルの保存場所を決める（ファイルの有無の組み合わせだけで決まる。副作用なし）。
+    //  ・既存の設定ファイルがあれば、それを使う（実行フォルダー → ユーザー別の順）。マーカーより優先する
+    //  ・初回起動（どちらにも無い）ときだけ、マーカーファイルでポータブルにする
+    //  ・マーカーがあっても実行フォルダーに書き込めないときは、ユーザー別にして警告を残す
+    internal static (bool Portable, string Reason, bool Warn) DecideLocation(
+        bool portableConfigExists, bool userConfigExists, bool markerExists, bool portableWritable)
+    {
+        if (portableConfigExists)
+        {
+            return (true, "実行ファイルのフォルダーに設定ファイルがあるため、ポータブルとして動作します", false);
+        }
+        if (userConfigExists)
+        {
+            return markerExists
+                ? (false, "ユーザー別の設定ファイルが既にあるため、マーカーファイル(" + PortableMarkerFileName + ")は使わず、ユーザー別として動作します", true)
+                : (false, "ユーザー別の設定ファイルがあるため、ユーザー別として動作します", false);
+        }
+        if (markerExists)
+        {
+            return portableWritable
+                ? (true, "初回起動: マーカーファイルがあるため、ポータブルとして設定ファイルを作成します", false)
+                : (false, "初回起動: マーカーファイルがありますが、実行ファイルのフォルダーに書き込めないため、ユーザー別として設定ファイルを作成します", true);
+        }
+        return (false, "初回起動: ユーザー別として設定ファイルを作成します", false);
     }
 
     // 切り替えが効いていないと、意図しない場所へ書き込む恐れがあるため起動時に確認する
@@ -119,46 +153,6 @@ static class ConfigStore
             MessageBox.Show($"設定ファイルを開けませんでした。\n\n場所: {FilePath}\n{ex.Message}", "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         return false;
-    }
-
-    // true: ポータブル / false: ユーザー別 / null: キャンセル
-    private static bool? AskStorageMode()
-    {
-        bool canWritePortable = CanWriteDirectory(PortableDirectory);
-
-        var userButton = new TaskDialogCommandLinkButton(
-            "ユーザーごとに作成する（推奨）",
-            "設定を「" + UserDirectory + "」に保存します。\nアプリを更新しても設定は消えません。");
-        var portableButton = new TaskDialogCommandLinkButton(
-            "ポータブルとして動作する",
-            canWritePortable
-                ? "設定を実行ファイルと同じフォルダーに保存します。\nフォルダーごと持ち運べます。更新時は設定ファイルを上書きしないでください。"
-                : "このフォルダーには書き込めないため、選択できません。")
-        {
-            Enabled = canWritePortable,
-        };
-
-        var page = new TaskDialogPage
-        {
-            Caption = "AlwaysIME",
-            Heading = "設定の保存場所を選んでください",
-            Text = "初回起動のため、設定ファイルの保存場所を選びます。",
-            Icon = TaskDialogIcon.Information,
-            AllowCancel = true,
-            DefaultButton = userButton,
-            Buttons = { userButton, portableButton, TaskDialogButton.Cancel },
-        };
-
-        TaskDialogButton result = TaskDialog.ShowDialog(page);
-        if (result == userButton)
-        {
-            return false;
-        }
-        if (result == portableButton)
-        {
-            return true;
-        }
-        return null;
     }
 
     private static bool CanWriteDirectory(string dir)
@@ -189,11 +183,16 @@ static class ConfigStore
             try
             {
                 doc = XDocument.Load(templatePath);
+                AppLog.Info("ひな形をもとに設定ファイルを作成します: " + templatePath);
             }
             catch (Exception ex)
             {
                 AppLog.Warn("ひな形を読み込めませんでした", ex);
             }
+        }
+        if (doc == null)
+        {
+            AppLog.Info("ひな形を使わず、既定値で設定ファイルを作成します（ひな形の場所: " + templatePath + "）");
         }
         doc ??= new XDocument(new XDeclaration("1.0", "utf-8", null));
 
