@@ -829,7 +829,7 @@ class ResidentTest : Form
         icon = new NotifyIcon();
         icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
         icon.Visible = true;
-        icon.Text = "AlwaysIME";
+        icon.Text = AppLog.IsElevatedProcess ? "AlwaysIME（管理者）" : "AlwaysIME";
         ContextMenuStrip menu = new ContextMenuStrip();
 
         ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();

@@ -159,6 +159,7 @@ public class ConfigForm : Form
     private CheckBox chkMsImeSwitch;
     private ComboBox cmbSpaceInit, cmbSpaceTo, cmbPunctInit, cmbPunctTo;
     private Control[] msimeControls;
+    private Label lblImeNotice;   // 対応していないIMEを使っているときの警告（MS-IME入力設定の下部）
 
     // バックアップパネル
     private static readonly double[] BackupHoursChoices = [1, 6, 12, 24, 48, 72];
@@ -243,7 +244,7 @@ public class ConfigForm : Form
         int LW = (int)(170 * uiScale);
         int SP = (int)(8 * uiScale);
 
-        this.Text = "AlwaysIME 設定";
+        this.Text = AppLog.IsElevatedProcess ? "AlwaysIME 設定（管理者）" : "AlwaysIME 設定";
         this.Font = new Font("Meiryo UI", 9);
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
@@ -406,6 +407,18 @@ public class ConfigForm : Form
             msimeHint,
         };
         this.Controls.AddRange(msimeControls);
+
+        lblImeNotice = new Label
+        {
+            Location = new Point(RX, panelTop + (int)(262 * uiScale)),
+            Size = new Size(RW, (int)(36 * uiScale)),
+            ForeColor = ResidentTest.darkModeEnabled ? Color.FromArgb(255, 170, 60) : Color.FromArgb(192, 80, 0),
+            Visible = false,
+        };
+        this.Controls.Add(lblImeNotice);
+        // 入力方式の切り替えや、他のウィンドウから戻ったときに、判定をやり直す
+        this.Activated += (s, e) => RefreshImeNotice();
+        this.InputLanguageChanged += (s, e) => RefreshImeNotice();
 
         // ---- 拡張設定パネル（キー / 値 / リセット） ----
         extFilter = new TextBox
@@ -741,6 +754,28 @@ public class ConfigForm : Form
         lblBackupLatest.ForeColor = Color.Gray;
     }
 
+    // 「MS-IME入力設定」の下部に、現在選択中のIMEが対応していない旨を表示する（表示だけで、設定は無効にしない）
+    private void RefreshImeNotice()
+    {
+        if (lblImeNotice == null)
+            return;
+        string text = null;
+        if (categories[selectedCategoryIndex].Type == "msime")
+        {
+            switch (ImeEnvironment.GetStatus())
+            {
+                case ImeEnvironment.Status.NotMsIme:
+                    text = "現在選択中のIMEでは利用できません。\r\nWindows 11の新しいMicrosoft IMEを選ぶと利用できます。";
+                    break;
+                case ImeEnvironment.Status.CompatMode:
+                    text = "互換モード（旧IME）のMicrosoft IMEでは利用できません。\r\nIMEの設定で互換モードをオフにすると利用できます。";
+                    break;
+            }
+        }
+        lblImeNotice.Text = text ?? "";
+        lblImeNotice.Visible = text != null;
+    }
+
     // ---- バージョン情報 ----
     private static string GetVersionText()
     {
@@ -776,6 +811,7 @@ public class ConfigForm : Form
         string logDir = AppLog.LogDirectory;
         return "バージョン: " + GetVersionText() + "\r\n" +
                "ライセンス: MIT License\r\n" +
+               "実行権限: " + (AppLog.IsElevatedProcess ? "管理者" : "通常のユーザー") + "\r\n" +
                (copyright.Length > 0 ? copyright + "\r\n" : "") + "\r\n" +
                "設定ファイル: " + ConfigStore.FilePath + "\r\n" +
                "保存方法: " + (ConfigStore.IsPortable ? "ポータブル（実行ファイルと同じフォルダー）" : "ユーザー別（%AppData%）") + "\r\n" +
@@ -1382,6 +1418,7 @@ public class ConfigForm : Form
 
         foreach (Control c in msimeControls)
             c.Visible = isMsIme;
+        RefreshImeNotice();
 
         foreach (Control c in extControls)
             c.Visible = cat.Type == "extended";
