@@ -51,6 +51,10 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="AlwaysIME.dll.config.default" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\LICENSE"
+        Link="LICENSE.txt"
+        CopyToOutputDirectory="PreserveNewest"
+        CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
