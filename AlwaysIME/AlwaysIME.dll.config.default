@@ -1,33 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
-    <appSettings>
-        <add key="AlwaysIMEMode" value="1" />
-        <add key="IsDarkMode" value="off" />
-        <add key="intervalTime" value="200" />
-        <add key="AppExitEnd" value="1" />
-        <add key="PassList" value="AlwaysIME,ShellExperienceHost" />
-        <add key="ImeOffList" value="cmd,powershell,pwsh,WindowsTerminal" />
-        <add key="ImeOffTitle" value="" />
-        <add key="UpdateTag" value="\(?更新\)?" />
-        <add key="NoKeyInputTime" value="3" />
-        <add key="SuspendFewTime" value="5" />
-        <add key="SuspendTime" value="45" />
-        <add key="OnActivatedAppList" value="" />
-        <add key="OnActivatedAppPath" value="" />
-        <add key="OnActivatedArgv" value="" />
-        <add key="BackgroundAppList" value="" />
-        <add key="BackgroundAppPath" value="" />
-        <add key="BackgroundArgv" value="" />
-        <add key="DelayBackgroundTime" value="" />
-        <add key="MsImeSwitch" value="0" />
-        <add key="Punctuation" value="1,3" />
-        <add key="SpaceWidth" value="1,2" />
-        <add key="KeyAssignment" value="" />
-        <add key="BackupStableHours" value="24" />
-        <add key="BackupKeep" value="5" />
-        <add key="LogEnabled" value="0" />
-        <add key="LogLevel" value="info" />
-        <add key="LogMaxSizeMB" value="1" />
-        <add key="LogKeep" value="3" />
-    </appSettings>
+  <appSettings>
+    <add key="AlwaysIMEMode" value="1" />
+    <add key="IsDarkMode" value="off" />
+    <add key="intervalTime" value="200" />
+    <add key="AppExitEnd" value="1" />
+    <add key="PassList" value="AlwaysIME,ShellExperienceHost" />
+    <add key="ImeOffList" value="cmd,powershell,pwsh,WindowsTerminal" />
+    <add key="ImeOffTitle" value="" />
+    <add key="UpdateTag" value="\(?更新\)?" />
+    <add key="NoKeyInputTime" value="3" />
+    <add key="SuspendFewTime" value="5" />
+    <add key="SuspendTime" value="45" />
+    <add key="OnActivatedAppList" value="" />
+    <add key="OnActivatedAppPath" value="" />
+    <add key="OnActivatedArgv" value="" />
+    <add key="BackgroundAppList" value="" />
+    <add key="BackgroundAppPath" value="" />
+    <add key="BackgroundArgv" value="" />
+    <add key="DelayBackgroundTime" value="" />
+    <add key="MsImeSwitch" value="0" />
+    <add key="Punctuation" value="1,3" />
+    <add key="SpaceWidth" value="1,2" />
+    <add key="KeyAssignment" value="" />
+    <add key="BackupStableHours" value="24" />
+    <add key="BackupKeep" value="5" />
+    <add key="LogEnabled" value="0" />
+    <add key="LogLevel" value="info" />
+    <add key="LogMaxSizeMB" value="1" />
+    <add key="LogKeep" value="3" />
+  </appSettings>
 </configuration>
