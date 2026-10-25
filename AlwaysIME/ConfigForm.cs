@@ -95,6 +95,13 @@ public class ConfigForm : Form
             Desc = "AlwaysIME.dll.config の全設定をここで変更できます。\r\n設定内容の詳細が分からないまま変更しないでください。\r\n「リセット」で初期値に戻せます（保存して閉じる／適用で反映）。",
             Type = "extended",
         },
+        new ConfigCategory
+        {
+            AppSettingKey = null,
+            Label = "バージョン情報",
+            Desc = "AlwaysIMEのバージョンと、設定・ログの保存場所です。\r\n問い合わせの際は、この内容をお知らせください。",
+            Type = "about",
+        },
     };
 
     // カテゴリーごとの作業用リスト（"list"タイプのみ使用）
@@ -136,6 +143,11 @@ public class ConfigForm : Form
     private RadioButton rbAutoNone, rbAutoStartup, rbAutoTask;
     private Label lblAutoStatus;
     private Control[] startupControls;
+
+    // バージョン情報パネル
+    private const string ReleasesUrl = "https://github.com/jarupxx/AlwaysIME/releases";
+    private Label lblAboutInfo;
+    private Control[] aboutControls;
     private bool autoStartLoaded = false;          // 自動起動パネルを表示して、状態を調べたか
     private AutoStartMode loadedAutoStartMode = AutoStartMode.None;
     private bool autoStartConflict = false;        // 両方に登録されていた
@@ -659,6 +671,45 @@ public class ConfigForm : Form
         };
         this.Controls.AddRange(startupControls);
 
+        // ---- バージョン情報パネル ----
+        Color aboutLinkColor = ResidentTest.darkModeEnabled ? BackupLinkColorDark : BackupLinkColor;
+        Label lblAboutName = new Label
+        {
+            Text = "AlwaysIME",
+            Location = new Point(RX, panelTop),
+            Size = new Size(RW, (int)(24 * uiScale)),
+            Font = new Font(this.Font.FontFamily, this.Font.Size + 3, FontStyle.Bold),
+        };
+        lblAboutInfo = new Label
+        {
+            Location = new Point(RX, panelTop + (int)(32 * uiScale)),
+            Size = new Size(RW, (int)(150 * uiScale)),
+        };
+        LinkLabel linkReleases = new LinkLabel
+        {
+            Text = "最新版を確認する（GitHub Releases）",
+            Location = new Point(RX, panelTop + (int)(192 * uiScale)),
+            AutoSize = true,
+            LinkColor = aboutLinkColor,
+            ActiveLinkColor = aboutLinkColor,
+            VisitedLinkColor = aboutLinkColor,
+            LinkBehavior = LinkBehavior.HoverUnderline,
+        };
+        linkReleases.LinkClicked += (s, e) => OpenReleasesPage();
+        LinkLabel linkCopyInfo = new LinkLabel
+        {
+            Text = "この内容をコピーする",
+            Location = new Point(RX, panelTop + (int)(216 * uiScale)),
+            AutoSize = true,
+            LinkColor = aboutLinkColor,
+            ActiveLinkColor = aboutLinkColor,
+            VisitedLinkColor = aboutLinkColor,
+            LinkBehavior = LinkBehavior.HoverUnderline,
+        };
+        linkCopyInfo.LinkClicked += (s, e) => CopyAboutInfo();
+        aboutControls = new Control[] { lblAboutName, lblAboutInfo, linkReleases, linkCopyInfo };
+        this.Controls.AddRange(aboutControls);
+
         // ---- 下部ボタン ----
         int btnY = H - (int)(36 * uiScale);
         btnSave = new Button { Text = "保存して閉じる", Location = new Point(RX, btnY), Size = new Size((int)(120 * uiScale), (int)(28 * uiScale)) };
@@ -688,6 +739,76 @@ public class ConfigForm : Form
 
         // バックアップ画面の補足の色（ダークモードの一括着色より後に設定する）
         lblBackupLatest.ForeColor = Color.Gray;
+    }
+
+    // ---- バージョン情報 ----
+    private static string GetVersionText()
+    {
+        var asm = typeof(ConfigForm).Assembly;
+        string v = null;
+        var attrs = asm.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false);
+        if (attrs.Length > 0)
+            v = ((System.Reflection.AssemblyInformationalVersionAttribute)attrs[0]).InformationalVersion;
+        if (string.IsNullOrEmpty(v))
+            v = asm.GetName().Version?.ToString();
+        if (string.IsNullOrEmpty(v))
+            return "不明";
+        // ビルド情報（+コミットハッシュ）は、先頭7文字だけ添える
+        int plus = v.IndexOf('+');
+        if (plus >= 0)
+        {
+            string hash = v.Substring(plus + 1);
+            v = v.Substring(0, plus) + (hash.Length >= 7 ? " (" + hash.Substring(0, 7) + ")" : "");
+        }
+        return v;
+    }
+
+    // .csprojの<Copyright>（AssemblyCopyrightAttribute）。未設定なら空文字
+    private static string GetCopyrightText()
+    {
+        var attrs = typeof(ConfigForm).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyCopyrightAttribute), false);
+        return attrs.Length > 0 ? ((System.Reflection.AssemblyCopyrightAttribute)attrs[0]).Copyright ?? "" : "";
+    }
+
+    private static string BuildAboutText()
+    {
+        string copyright = GetCopyrightText();
+        string logDir = AppLog.LogDirectory;
+        return "バージョン: " + GetVersionText() + "\r\n" +
+               "ライセンス: MIT License\r\n" +
+               (copyright.Length > 0 ? copyright + "\r\n" : "") + "\r\n" +
+               "設定ファイル: " + ConfigStore.FilePath + "\r\n" +
+               "保存方法: " + (ConfigStore.IsPortable ? "ポータブル（実行ファイルと同じフォルダー）" : "ユーザー別（%AppData%）") + "\r\n" +
+               "ログ: " + (string.IsNullOrEmpty(logDir) ? "（なし）" : logDir);
+    }
+
+    private void RefreshAboutPanel()
+    {
+        lblAboutInfo.Text = BuildAboutText();
+    }
+
+    private void CopyAboutInfo()
+    {
+        try
+        {
+            Clipboard.SetText("AlwaysIME\r\n" + BuildAboutText());
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "コピーできませんでした。\n\n" + ex.Message, "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void OpenReleasesPage()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = ReleasesUrl, UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "ページを開けませんでした。\n\n" + ReleasesUrl + "\n" + ex.Message, "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
 
     private static Label MakeMsImeLabel(string text, int x, int y, int w, int h)
@@ -1270,6 +1391,12 @@ public class ConfigForm : Form
             c.Visible = isBackup;
         if (isBackup)
             RefreshBackupPanel();
+
+        bool isAbout = cat.Type == "about";
+        foreach (Control c in aboutControls)
+            c.Visible = isAbout;
+        if (isAbout)
+            RefreshAboutPanel();
 
         if (isList)
         {
