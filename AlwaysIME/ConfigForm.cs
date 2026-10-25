@@ -244,7 +244,7 @@ public class ConfigForm : Form
         int LW = (int)(170 * uiScale);
         int SP = (int)(8 * uiScale);
 
-        this.Text = "AlwaysIME 設定";
+        this.Text = AppLog.IsElevatedProcess ? "AlwaysIME 設定（管理者）" : "AlwaysIME 設定";
         this.Font = new Font("Meiryo UI", 9);
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
@@ -811,6 +811,7 @@ public class ConfigForm : Form
         string logDir = AppLog.LogDirectory;
         return "バージョン: " + GetVersionText() + "\r\n" +
                "ライセンス: MIT License\r\n" +
+               "実行権限: " + (AppLog.IsElevatedProcess ? "管理者" : "通常のユーザー") + "\r\n" +
                (copyright.Length > 0 ? copyright + "\r\n" : "") + "\r\n" +
                "設定ファイル: " + ConfigStore.FilePath + "\r\n" +
                "保存方法: " + (ConfigStore.IsPortable ? "ポータブル（実行ファイルと同じフォルダー）" : "ユーザー別（%AppData%）") + "\r\n" +

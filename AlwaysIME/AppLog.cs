@@ -516,6 +516,25 @@ static class AppLog
         }
     }
 
+    // 管理者権限で動作しているか（画面表示用）。判定できないときは false
+    internal static bool IsElevatedProcess { get; } = DetectElevated();
+
+    private static bool DetectElevated()
+    {
+        try
+        {
+            using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+            {
+                var principal = new System.Security.Principal.WindowsPrincipal(identity);
+                return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static string IsElevated()
     {
         try
