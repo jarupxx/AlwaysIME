@@ -176,7 +176,7 @@ public class ConfigForm : Form
     // 拡張設定の各キーの説明（セルにマウスを合わせたときのポップアップ表示）
     private static readonly Dictionary<string, string> ConfigDescriptions = new Dictionary<string, string>
     {
-        { "AlwaysIMEMode", "IMEの制御モードです。\n1: IMEオン（常にオンにする）\n2: IMEオフ\n3: グローバル（直前のIME状態を維持する）\n※ on / off も指定できます（on=1、off=3）。" },
+        { "AlwaysIMEMode", "IMEの制御モードです。\n1: IMEオン（常にオンにする）\n2: IMEオフ\n3: グローバル（直前のIME状態を維持する）" },
         { "IsDarkMode", "トレイメニューや設定画面をダークモードにします。\non: ダークモード / それ以外: 通常\n※ メニューへの反映は再起動後です。" },
         { "PassList", "IMEを一切操作しないアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: AlwaysIME,notepad" },
         { "ImeOffList", "アプリの切り替えやウィンドウタイトルの変化時に、IMEをオフにするアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。\n例: cmd,powershell" },
@@ -185,7 +185,7 @@ public class ConfigForm : Form
         { "intervalTime", "IMEの状態を監視する間隔です（ミリ秒）。\n小さいほど反応が早くなりますが、負荷が増えます。\n例: 200" },
         { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。" },
         { "SuspendTime", "トレイメニュー「しばらく無効」で、機能を停止する時間です（分）。" },
-        { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分で、小数も指定できます（0.1 = 6秒）。" },
+        { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
         { "DelayBackgroundTime", "BackgroundAppList のアプリが非アクティブになってから、連携アプリ（BackgroundAppPath）を起動するまでの時間です（分）。\n空欄の場合は無効です。" },
         { "OnActivatedAppList", "アクティブになったときに連携アプリ（OnActivatedAppPath）を起動するアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。" },
         { "OnActivatedAppPath", "OnActivatedAppList のアプリがアクティブになったときに起動する連携アプリのパスです。\n存在しないパスを指定すると警告が表示されます。" },
@@ -1088,7 +1088,7 @@ public class ConfigForm : Form
             Configuration config = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.None);
             foreach (string key in config.AppSettings.Settings.AllKeys)
                 extBaseline[key] = config.AppSettings.Settings[key].Value ?? "";
-            foreach (var kv in ResidentTest.DefaultConfigValues)
+            foreach (var kv in ConfigStore.Defaults)
             {
                 if (!extBaseline.ContainsKey(kv.Key))
                     extBaseline[kv.Key] = kv.Value;
@@ -1117,7 +1117,7 @@ public class ConfigForm : Form
     // キー・値・リセットの各セルに、説明と初期値をポップアップで表示する
     private static void SetExtToolTips(DataGridViewRow row, string key)
     {
-        bool hasDefault = ResidentTest.DefaultConfigValues.TryGetValue(key, out string defaultValue);
+        bool hasDefault = ConfigStore.Defaults.TryGetValue(key, out string defaultValue);
         string description = ConfigDescriptions.TryGetValue(key, out string d)
             ? d
             : "この項目の説明はありません。";
@@ -1169,7 +1169,7 @@ public class ConfigForm : Form
             return;
         DataGridViewRow row = extGrid.Rows[e.RowIndex];
         string key = Convert.ToString(row.Cells[ExtColKey].Value) ?? "";
-        if (!ResidentTest.DefaultConfigValues.TryGetValue(key, out string defaultValue))
+        if (!ConfigStore.Defaults.TryGetValue(key, out string defaultValue))
             return;
         extGrid.EndEdit();
         SetExtValue(row, defaultValue);
@@ -1195,7 +1195,7 @@ public class ConfigForm : Form
         string key = Convert.ToString(row.Cells[ExtColKey].Value) ?? "";
         string current = Convert.ToString(row.Cells[ExtColValue].Value) ?? "";
         bool changed = extPending.ContainsKey(key);
-        bool atDefault = !ResidentTest.DefaultConfigValues.TryGetValue(key, out string defaultValue) || current == defaultValue;
+        bool atDefault = !ConfigStore.Defaults.TryGetValue(key, out string defaultValue) || current == defaultValue;
 
         DataGridViewCell valueCell = row.Cells[ExtColValue];
         valueCell.Style.Font = changed ? extBoldFont : null;
@@ -1426,7 +1426,21 @@ public class ConfigForm : Form
         foreach (var kv in extPending)
             SetAppSetting(config, kv.Key, kv.Value);
 
-        config.Save(ConfigurationSaveMode.Modified);
+        try
+        {
+            config.Save(ConfigurationSaveMode.Modified);
+        }
+        catch (Exception ex)
+        {
+            // 書き込めない場所（Program Files配下、読み取り専用など）では、保存できなかったことを知らせる
+            AppLog.Error("設定を保存できませんでした: " + ConfigStore.FilePath, ex);
+            MessageBox.Show(this,
+                "設定を保存できませんでした。\n\n" +
+                $"場所: {ConfigStore.FilePath}\n{ex.Message}\n\n" +
+                "書き込める場所へ移動するか、設定ファイルの権限を確認してください。",
+                "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return false;
+        }
         ConfigurationManager.RefreshSection("appSettings");
 
         // ログの設定を即時反映する

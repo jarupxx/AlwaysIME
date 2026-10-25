@@ -50,6 +50,21 @@ class MainWindow
                 mutex.ReleaseMutex();
                 return;
             }
+            // 設定ファイルの不足キーを補い、不正な値をひな形の値に置き換える（壊れたファイルの復旧が済んだ後に行う）
+            ConfigStore.RepairResult repair = ConfigStore.RepairUserConfig();
+            if (repair.Changed && !repair.WriteFailed)
+            {
+                // AppLog.Configure() などが修復前の内容を読んでいるため、キャッシュを破棄して修復後のファイルを読み直させる
+                ConfigurationManager.RefreshSection("appSettings");
+            }
+            if (repair.Replaced.Count > 0)
+            {
+                string keys = string.Join(", ", repair.Replaced.Select(r => r.Key));
+                string note = repair.WriteFailed ? "\n※ 設定ファイルには書き込めませんでした。" : "";
+                string logHint = AppLog.IsEnabled ? "\n詳細はログを参照してください: " + AppLog.FilePath : "";
+                MessageBox.Show("設定の一部が不正だったため、ひな形の値に戻しました。\n\n対象: " + keys + note + logHint,
+                    "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
             ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
             WatchForRestartSignal();
@@ -157,11 +172,15 @@ class ResidentTest : Form
     private static string RunOnActivatedArgv;
     private static string RunBackgroundAppPath;
     private static string FWBackgroundArgv;
-    private static int imeInterval = 200;
-    private static int SuspendFewInterval = 5;
-    private static int SuspendInterval = 45;
-    private static int DelayBackgroundInterval = 2147483647;
-    internal static int noKeyInputInterval = 6000;
+    // 次の4つは既定値を持たない。起動時に InitializeAppConfig() が、検証済みの設定値で必ず設定する
+    // （既定値はひな形ファイルだけが持つ）
+    private static int imeInterval;
+    private static int SuspendFewInterval;
+    private static int SuspendInterval;
+    internal static int noKeyInputInterval;
+    // 未設定（遅延起動しない）を表す値。「既定値」ではなく「クリア状態」
+    private const int DelayBackgroundDisabled = int.MaxValue;
+    private static int DelayBackgroundInterval = DelayBackgroundDisabled;
     private DateTime lastInputTime;
     IntPtr imwd;
     int imeConvMode = 0;
@@ -291,42 +310,9 @@ class ResidentTest : Form
         this.lastInputTime = DateTime.Now;
     }
 
-    // 設定項目ごとの初期値(AlwaysIME.dll.configへ書き戻す際に使用する)
-    internal static readonly Dictionary<string, string> DefaultConfigValues = new Dictionary<string, string>
-    {
-        { "AlwaysIMEMode", "1" },
-        { "intervalTime", "200" },
-        { "SuspendFewTime", "5" },
-        { "SuspendTime", "45" },
-        { "NoKeyInputTime", "0.1" },
-        { "DelayBackgroundTime", "" },
-        { "Punctuation", "0,0" },
-        { "SpaceWidth", "0,0" },
-        { "AppExitEnd", "1" },
-        { "MsImeSwitch", "0" },
-        { "KeyAssignment", "" },
-        { "IsDarkMode", "off" },
-        { "PassList", "" },
-        { "ImeOffList", "" },
-        { "ImeOffTitle", "" },
-        { "UpdateTag", "" },
-        { "OnActivatedAppList", "" },
-        { "OnActivatedAppPath", "" },
-        { "OnActivatedArgv", "" },
-        { "BackgroundAppList", "" },
-        { "BackgroundAppPath", "" },
-        { "BackgroundArgv", "" },
-        { "BackupStableHours", "24" },
-        { "BackupKeep", "5" },
-        { "LogEnabled", "1" },
-        { "LogLevel", "info" },
-        { "LogMaxSizeMB", "1" },
-        { "LogKeep", "3" },
-    };
-
     // 設定値が不正な場合に確認ダイアログを表示する。
-    // 「初期値にする」: 初期値をAlwaysIME.dll.configへ書き戻して続行(この呼び出し元の
-    //                   フォールバック処理でメモリ上の値も初期値になる)。
+    // 「初期値にする」: ひな形の値をAlwaysIME.dll.configへ書き戻して続行(呼び出し元の
+    //                   GetSetting()がメモリ上でもひな形の値を使う)。
     // 「設定を確認」  : AlwaysIME.dll.configを既定のアプリで開き、閉じたら設定を
     //                   再読み込みして最初からやり直す。
     private static void HandleInvalidConfigValue(string settingKey)
@@ -347,10 +333,10 @@ class ResidentTest : Form
         }
     }
 
-    // 指定した設定項目の値をAlwaysIME.dll.config上で初期値に書き換える
+    // 指定した設定項目の値をAlwaysIME.dll.config上でひな形の値に書き換える
     private static void UpdateConfigDefaultValue(string settingKey)
     {
-        if (!DefaultConfigValues.TryGetValue(settingKey, out string defaultValue))
+        if (!ConfigStore.Defaults.TryGetValue(settingKey, out string defaultValue))
         {
             return;
         }
@@ -491,151 +477,64 @@ class ResidentTest : Form
         }
     }
 
+    // 設定ファイルの値を、メモリ上の状態へ反映する。
+    // 先頭で「クリア状態」(null / [0, 0] / 未設定)に戻してから、検証済みの値だけを反映する。
+    // 既定値はここに持たない。ファイルに無い値・不正な値は GetSetting() がひな形の値で扱う。
     private static void InitializeAppConfigCore()
     {
+        // ---- クリア状態 ----
         List[PassArray] = null;
         List[ImeOffArray] = null;
         List[ImeOffTitleArray] = null;
+        List[RemoveUpdateTagArray] = null;
         List[OnActivatedAppArray] = null;
         List[BackgroundArray] = null;
         val[ConfigPunctuation] = [0, 0];
         val[ConfigSpaceWidth] = [0, 0];
+        RunOnActivatedAppPath = null;
+        RunOnActivatedArgv = null;
+        RunBackgroundAppPath = null;
+        FWBackgroundArgv = null;
+        DelayBackgroundInterval = DelayBackgroundDisabled;
         keyPath[ConfigPunctuation] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
         valueName[ConfigPunctuation] = "option1";
         valueType[ConfigPunctuation] = RegistryValueKind.DWord;
         keyPath[ConfigSpaceWidth] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
         valueName[ConfigSpaceWidth] = "InputSpace";
         valueType[ConfigSpaceWidth] = RegistryValueKind.DWord;
-        string buff = ConfigurationManager.AppSettings["AlwaysIMEMode"];
-        if (!string.IsNullOrEmpty(buff))
+
+        // ---- 設定値の反映 ----
+        string buff = GetSetting("AlwaysIMEMode").ToLowerInvariant();
+        if (buff == "off")
         {
             // 互換設定
-            if (buff.ToLower().CompareTo("off") == 0)
-            {
-                ImeModeGlobal = IMEMODE_GLOBAL;
-            }
-            else if (buff.ToLower().CompareTo("on") == 0)
-
-            {
-                ImeModeGlobal = IMEMODE_ON;
-            }
-            else if (int.TryParse(buff, out int parsedImeMode) && parsedImeMode >= 1 && parsedImeMode <= 3)
-            {
-                ImeModeGlobal = parsedImeMode;
-            }
-            else
-            {
-                HandleInvalidConfigValue("AlwaysIMEMode");
-                ImeModeGlobal = IMEMODE_ON;
-            }
+            ImeModeGlobal = IMEMODE_GLOBAL;
         }
-        else
+        else if (buff == "on")
         {
             ImeModeGlobal = IMEMODE_ON;
         }
-        buff = ConfigurationManager.AppSettings["IsDarkMode"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            if (buff.ToLower().CompareTo("on") == 0)
-            {
-                darkModeEnabled = true;
-            }
-            else
-            {
-                darkModeEnabled = false;
-            }
-        }
         else
         {
-            darkModeEnabled = false;
+            ImeModeGlobal = int.Parse(buff, System.Globalization.CultureInfo.InvariantCulture);
         }
-        buff = ConfigurationManager.AppSettings["PassList"];
-        if (!string.IsNullOrEmpty(buff))
+        darkModeEnabled = GetSetting("IsDarkMode").Equals("on", StringComparison.OrdinalIgnoreCase);
+        List[PassArray] = SplitList(GetSetting("PassList"));
+        List[ImeOffArray] = SplitList(GetSetting("ImeOffList"));
+        List[ImeOffTitleArray] = SplitList(GetSetting("ImeOffTitle"));
+        List[RemoveUpdateTagArray] = SplitList(GetSetting("UpdateTag"));
+        imeInterval = ParseInt(GetSetting("intervalTime"));
+        SuspendFewInterval = ParseInt(GetSetting("SuspendFewTime"));
+        SuspendInterval = ParseInt(GetSetting("SuspendTime"));
+        noKeyInputInterval = (int)Math.Round(ParseDouble(GetSetting("NoKeyInputTime")) * 60 * 1000);
+        buff = GetSetting("DelayBackgroundTime");
+        if (buff.Length > 0)
         {
-            List[PassArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
+            DelayBackgroundInterval = (int)(ParseDouble(buff) * 60 * 1000 / imeInterval);
         }
-        buff = ConfigurationManager.AppSettings["ImeOffList"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            List[ImeOffArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        }
-        buff = ConfigurationManager.AppSettings["ImeOffTitle"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            List[ImeOffTitleArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        }
-        buff = ConfigurationManager.AppSettings["UpdateTag"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            List[RemoveUpdateTagArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        }
-        buff = ConfigurationManager.AppSettings["intervalTime"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            if (int.TryParse(buff, out int parsedIntervalTime))
-            {
-                imeInterval = parsedIntervalTime;
-            }
-            else
-            {
-                HandleInvalidConfigValue("intervalTime");
-            }
-        }
-        buff = ConfigurationManager.AppSettings["SuspendFewTime"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            if (int.TryParse(buff, out int parsedSuspendFewTime))
-            {
-                SuspendFewInterval = parsedSuspendFewTime;
-            }
-            else
-            {
-                HandleInvalidConfigValue("SuspendFewTime");
-            }
-        }
-        buff = ConfigurationManager.AppSettings["SuspendTime"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            if (int.TryParse(buff, out int parsedSuspendTime))
-            {
-                SuspendInterval = parsedSuspendTime;
-            }
-            else
-            {
-                HandleInvalidConfigValue("SuspendTime");
-            }
-        }
-        buff = ConfigurationManager.AppSettings["NoKeyInputTime"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            if (float.TryParse(buff, out float parsedNoKeyInputTime))
-            {
-                noKeyInputInterval = (int)(parsedNoKeyInputTime * 60 * 1000);
-            }
-            else
-            {
-                HandleInvalidConfigValue("NoKeyInputTime");
-            }
-        }
-        buff = ConfigurationManager.AppSettings["DelayBackgroundTime"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            if (float.TryParse(buff, out float parsedDelayBackgroundTime))
-            {
-                DelayBackgroundInterval = (int)(parsedDelayBackgroundTime * 60 * 1000 / imeInterval);
-            }
-            else
-            {
-                HandleInvalidConfigValue("DelayBackgroundTime");
-            }
-        }
-        buff = ConfigurationManager.AppSettings["OnActivatedAppList"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            List[OnActivatedAppArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        }
-        buff = (ConfigurationManager.AppSettings["OnActivatedAppPath"]);
-        if (!string.IsNullOrEmpty(buff))
+        List[OnActivatedAppArray] = SplitList(GetSetting("OnActivatedAppList"));
+        buff = GetSetting("OnActivatedAppPath");
+        if (buff.Length > 0)
         {
             if (!File.Exists(buff))
             {
@@ -646,22 +545,11 @@ class ResidentTest : Form
                 RunOnActivatedAppPath = buff;
             }
         }
-        /* else
-        {
-            List[OnActivatedAppArray] = null;
-        } */
-        buff = ConfigurationManager.AppSettings["OnActivatedArgv"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            RunOnActivatedArgv = buff;
-        }
-        buff = ConfigurationManager.AppSettings["BackgroundAppList"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            List[BackgroundArray] = buff.Split(separator, StringSplitOptions.RemoveEmptyEntries);
-        }
-        buff = (ConfigurationManager.AppSettings["BackgroundAppPath"]);
-        if (!string.IsNullOrEmpty(buff))
+        buff = GetSetting("OnActivatedArgv");
+        RunOnActivatedArgv = buff.Length > 0 ? buff : null;
+        List[BackgroundArray] = SplitList(GetSetting("BackgroundAppList"));
+        buff = GetSetting("BackgroundAppPath");
+        if (buff.Length > 0)
         {
             if (!File.Exists(buff))
             {
@@ -673,43 +561,17 @@ class ResidentTest : Form
                 RunBackgroundAppPath = buff;
             }
         }
-        /* else
-        {
-            List[BackgroundArray] = null;
-        } */
-        buff = ConfigurationManager.AppSettings["BackgroundArgv"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            FWBackgroundArgv = buff;
-        }
+        buff = GetSetting("BackgroundArgv");
+        FWBackgroundArgv = buff.Length > 0 ? buff : null;
+
         // MS-IME入力設定(スペース/句読点切替)の有効/無効
-        // 設定画面で明示的に無効("0")にした場合のみ、レジストリへの書き込みと切替を行わない。
-        // 未設定の場合は従来どおり Punctuation / SpaceWidth の設定値で動作する。
-        string msImeSwitchBuff = ConfigurationManager.AppSettings["MsImeSwitch"];
-        if (!string.IsNullOrEmpty(msImeSwitchBuff) && msImeSwitchBuff != "0" && msImeSwitchBuff != "1")
-        {
-            HandleInvalidConfigValue("MsImeSwitch");
-            msImeSwitchBuff = "0";
-        }
-        bool msImeSwitchActive = msImeSwitchBuff != "0";
-        buff = ConfigurationManager.AppSettings["Punctuation"];
-        if (!string.IsNullOrEmpty(buff) && msImeSwitchActive)
+        // "0" のときだけ、レジストリへの書き込みと切替を行わない。
+        bool msImeSwitchActive = GetSetting("MsImeSwitch") != "0";
+        buff = GetSetting("Punctuation");
+        if (buff.Length > 0 && msImeSwitchActive && TryParseConfigPair(buff, 3, out int punctInit, out int punctTarget))
         {
             int temp = 0x7FFCFFFF & (int)ReadRegistryValue(RegistryHive.CurrentUser, keyPath[ConfigPunctuation], valueName[ConfigPunctuation], valueType[ConfigPunctuation]);
-            string[] parts = buff.Split(',');
-            val[ConfigPunctuation] = new int[2];
-            for (int i = 0; i < parts.Length; i++)
-            {
-                if (int.TryParse(parts[i], out int parsedPunctuation) && parsedPunctuation >= 0 && parsedPunctuation <= 3)
-                {
-                    val[ConfigPunctuation][i] = temp | parsedPunctuation << 16;
-                }
-                else
-                {
-                    HandleInvalidConfigValue("Punctuation");
-                    val[ConfigPunctuation] = [0, 0];
-                }
-            }
+            val[ConfigPunctuation] = [temp | punctInit << 16, temp | punctTarget << 16];
             SetPunctuationMode = val[ConfigPunctuation][0];
             if (val[ConfigPunctuation][0] == 0 && val[ConfigPunctuation][1] == 0)
             {
@@ -727,23 +589,10 @@ class ResidentTest : Form
                 }
             }
         }
-        buff = ConfigurationManager.AppSettings["SpaceWidth"];
-        if (!string.IsNullOrEmpty(buff) && msImeSwitchActive)
+        buff = GetSetting("SpaceWidth");
+        if (buff.Length > 0 && msImeSwitchActive && TryParseConfigPair(buff, 2, out int spaceInit, out int spaceTarget))
         {
-            string[] parts = buff.Split(',');
-            val[ConfigSpaceWidth] = new int[2];
-            for (int i = 0; i < parts.Length; i++)
-            {
-                if (int.TryParse(parts[i], out int parsedSpaceWidth) && parsedSpaceWidth >= 0 && parsedSpaceWidth <= 2)
-                {
-                    val[ConfigSpaceWidth][i] = parsedSpaceWidth;
-                }
-                else
-                {
-                    HandleInvalidConfigValue("SpaceWidth");
-                    val[ConfigSpaceWidth] = [0, 0];
-                }
-            }
+            val[ConfigSpaceWidth] = [spaceInit, spaceTarget];
             SetSpaceMode = val[ConfigSpaceWidth][0];
             if (val[ConfigSpaceWidth][0] == 0 && val[ConfigSpaceWidth][1] == 0)
             {
@@ -761,41 +610,46 @@ class ResidentTest : Form
                 }
             }
         }
-        buff = ConfigurationManager.AppSettings["KeyAssignment"];
-        if (!string.IsNullOrEmpty(buff))
+        buff = GetSetting("KeyAssignment");
+        if (buff.Length > 0)
         {
-            if (int.TryParse(buff, out int parsedKeyAssignment) && (parsedKeyAssignment == 0 || parsedKeyAssignment == 1))
-            {
-                ApplyKeyAssignment(parsedKeyAssignment == 1);
-            }
-            else
-            {
-                HandleInvalidConfigValue("KeyAssignment");
-            }
+            ApplyKeyAssignment(buff == "1");
         }
         else
         {
             // 管理対象外になった場合は元の設定に戻す
             RestoreKeyAssignment();
         }
-        buff = ConfigurationManager.AppSettings["AppExitEnd"];
-        if (!string.IsNullOrEmpty(buff))
-        {
-            if (int.TryParse(buff, out int parsedAppExitEnd))
-            {
-                AppExitEndEnabled = parsedAppExitEnd == 1;
-            }
-            else
-            {
-                HandleInvalidConfigValue("AppExitEnd");
-                AppExitEndEnabled = true;
-            }
-        }
-        else
-        {
-            AppExitEndEnabled = true;
-        }
+        AppExitEndEnabled = GetSetting("AppExitEnd") == "1";
     }
+
+    // 設定値を取得する。戻り値は必ず ConfigSchema の検証を通った値（空欄は、空欄を許すキーだけ）。
+    //  ・ファイルにキーが無い     : ひな形の値を使う
+    //  ・値が不正（手編集など）   : 確認ダイアログを出す。「初期値にする」ならひな形の値を書き戻して使い、
+    //                               「設定を確認」なら編集後に再読み込みして、この処理は打ち切る
+    private static string GetSetting(string key)
+    {
+        string raw = ConfigurationManager.AppSettings[key];
+        if (raw == null)
+        {
+            AppLog.Warn($"設定ファイルにキーが無いため、ひな形の値を使います: {key}");
+            return ConfigStore.Defaults[key];
+        }
+        string reason = ConfigSchema.Check(key, raw);
+        if (reason == null)
+        {
+            return raw;
+        }
+        AppLog.Warn($"設定値が不正です: {key} = \"{raw}\"（{reason}）");
+        HandleInvalidConfigValue(key);
+        return ConfigStore.Defaults[key];
+    }
+
+    // GetSetting() で検証済みの値だけを渡すこと
+    private static int ParseInt(string s) => int.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+    private static double ParseDouble(string s) => double.Parse(s, System.Globalization.CultureInfo.InvariantCulture);
+    private static string[] SplitList(string s) => s.Length > 0 ? s.Split(separator, StringSplitOptions.RemoveEmptyEntries) : null;
+
     // ============================================================
     // MS-IME入力設定
     // ============================================================
