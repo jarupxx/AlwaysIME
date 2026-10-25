@@ -70,6 +70,13 @@ public class ConfigForm : Form
         new ConfigCategory
         {
             AppSettingKey = null,
+            Label = "自動起動",
+            Desc = "Windowsへのログオン時に、AlwaysIMEを自動で起動する方法を選びます。\r\n現在のユーザーだけが対象で、管理者権限は不要です。",
+            Type = "startup",
+        },
+        new ConfigCategory
+        {
+            AppSettingKey = null,
             Label = "上級者向け設定",
             Desc = "動作に詳しい方向けの設定です。\r\n通常は変更不要です。",
             Type = "advanced",
@@ -124,6 +131,14 @@ public class ConfigForm : Form
     private ComboBox cmbLogLevel, cmbLogSize, cmbLogKeep;
     private LinkLabel linkLogFolder;
     private Control[] logControls;
+
+    // 自動起動パネル（登録の有無は、設定ファイルではなく実際のショートカット/タスクで判断する）
+    private RadioButton rbAutoNone, rbAutoStartup, rbAutoTask;
+    private Label lblAutoStatus;
+    private Control[] startupControls;
+    private bool autoStartLoaded = false;          // 自動起動パネルを表示して、状態を調べたか
+    private AutoStartMode loadedAutoStartMode = AutoStartMode.None;
+    private bool autoStartConflict = false;        // 両方に登録されていた
 
     // MS-IME入力設定パネル
     private static readonly string[] InputSpaceLabels = ["現在の入力モード", "常に全角", "常に半角"];
@@ -599,6 +614,51 @@ public class ConfigForm : Form
         };
         this.Controls.AddRange(logControls);
 
+        // ---- 自動起動パネル ----
+        int hintX = RX + (int)(22 * uiScale);
+        int hintW = RW - (int)(22 * uiScale);
+        rbAutoNone = new RadioButton
+        {
+            Text = "自動起動しない",
+            Location = new Point(RX, panelTop),
+            Size = new Size(RW, (int)(24 * uiScale)),
+        };
+        rbAutoStartup = new RadioButton
+        {
+            Text = "スタートアップにショートカットを作成する",
+            Location = new Point(RX, panelTop + (int)(32 * uiScale)),
+            Size = new Size(RW, (int)(24 * uiScale)),
+        };
+        Label hintStartup = MakeMsImeLabel(
+            "Windowsへのログオン後、すぐに起動します。\r\nショートカットは、現在のユーザーの「スタートアップ」フォルダーに作成されます。",
+            hintX, panelTop + (int)(58 * uiScale), hintW, (int)(36 * uiScale));
+        rbAutoTask = new RadioButton
+        {
+            Text = "タスクスケジューラに登録する",
+            Location = new Point(RX, panelTop + (int)(104 * uiScale)),
+            Size = new Size(RW, (int)(24 * uiScale)),
+        };
+        Label hintTask = MakeMsImeLabel(
+            "ログオンの10秒後に起動します。ログオン直後の混雑を避けたい場合に向いています。\r\n管理者権限は不要ですが、組織の設定によっては登録できない場合があります。",
+            hintX, panelTop + (int)(130 * uiScale), hintW, (int)(50 * uiScale));
+        lblAutoStatus = new Label
+        {
+            Location = new Point(RX, panelTop + (int)(190 * uiScale)),
+            Size = new Size(RW, (int)(40 * uiScale)),
+            Font = extBoldFont,
+        };
+        Label autoNote = MakeMsImeLabel(
+            "※ 2つの方法は同時に使えません。選ばなかった方法の登録は削除します。\r\n" +
+            "※ 実行ファイルを移動すると、次回の起動時に登録内容を自動で更新します。\r\n" +
+            "※ 変更は「保存して閉じる」または「適用」を押すと反映されます。",
+            RX, panelTop + (int)(236 * uiScale), RW, (int)(66 * uiScale));
+
+        startupControls = new Control[]
+        {
+            rbAutoNone, rbAutoStartup, hintStartup, rbAutoTask, hintTask, lblAutoStatus, autoNote,
+        };
+        this.Controls.AddRange(startupControls);
+
         // ---- 下部ボタン ----
         int btnY = H - (int)(36 * uiScale);
         btnSave = new Button { Text = "保存して閉じる", Location = new Point(RX, btnY), Size = new Size((int)(120 * uiScale), (int)(28 * uiScale)) };
@@ -616,7 +676,7 @@ public class ConfigForm : Form
         {
             foreach (Control c in this.Controls)
             {
-                if (c is Label || c is CheckBox)
+                if (c is Label || c is CheckBox || c is RadioButton)
                     c.ForeColor = Color.White;
                 if (c is Button || c is TextBox || c is ListBox || c is NumericUpDown || c is ComboBox)
                 {
@@ -763,6 +823,79 @@ public class ConfigForm : Form
             cmbBackupKeep.Items.Add(v.ToString());
         }
         cmbBackupKeep.SelectedIndex = backupKeepValues.IndexOf(keep);
+    }
+
+    // ============================================================
+    // 自動起動
+    // ============================================================
+
+    // 実際の登録状態を調べて、画面に反映する（タスクスケジューラへの問い合わせがあるため、パネルを初めて開いたときに行う）
+    private void LoadAutoStartState()
+    {
+        Cursor previous = this.Cursor;
+        this.Cursor = Cursors.WaitCursor;
+        try
+        {
+            AutoStartState state = AutoStart.Detect();
+            loadedAutoStartMode = state.Mode;
+            autoStartConflict = state.Conflict;
+            autoStartLoaded = true;
+
+            rbAutoNone.Checked = state.Mode == AutoStartMode.None;
+            rbAutoStartup.Checked = state.Mode == AutoStartMode.StartupFolder;
+            rbAutoTask.Checked = state.Mode == AutoStartMode.TaskScheduler;
+
+            string text;
+            if (state.Conflict)
+                text = "現在の状態: スタートアップとタスクスケジューラの両方に登録されています。\r\n保存すると、選んだ方法だけにします。";
+            else if (state.Mode == AutoStartMode.StartupFolder)
+                text = "現在の状態: スタートアップにショートカットがあります。";
+            else if (state.Mode == AutoStartMode.TaskScheduler)
+                text = "現在の状態: タスクスケジューラに登録されています。";
+            else
+                text = "現在の状態: 自動起動は設定されていません。";
+            if (state.TaskExists == null)
+                text += "\r\n（タスクスケジューラの状態を確認できませんでした。）";
+            lblAutoStatus.Text = text;
+        }
+        finally
+        {
+            this.Cursor = previous;
+        }
+    }
+
+    // 選択された方法を登録する（パネルを開いていない場合や、変更がない場合は何もしない）
+    private void ApplyAutoStartSelection()
+    {
+        if (!autoStartLoaded)
+            return;
+
+        AutoStartMode selected = rbAutoTask.Checked ? AutoStartMode.TaskScheduler
+            : rbAutoStartup.Checked ? AutoStartMode.StartupFolder
+            : AutoStartMode.None;
+        if (selected == loadedAutoStartMode && !autoStartConflict)
+            return;
+
+        Cursor previous = this.Cursor;
+        this.Cursor = Cursors.WaitCursor;
+        bool ok;
+        string error;
+        try
+        {
+            ok = AutoStart.TryApply(selected, out error);
+        }
+        finally
+        {
+            this.Cursor = previous;
+        }
+
+        if (!ok)
+        {
+            MessageBox.Show(this, "自動起動の設定を完全には変更できませんでした。\n\n" + error,
+                "AlwaysIME", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+        // 実際の登録状態を読み直して、画面に反映する
+        LoadAutoStartState();
     }
 
     // ログ出力の設定を、コントロールへ読み込む（一覧にない値は選択肢として追加する）
@@ -1120,6 +1253,12 @@ public class ConfigForm : Form
         foreach (Control c in logControls)
             c.Visible = isAdvanced;
 
+        bool isStartup = cat.Type == "startup";
+        foreach (Control c in startupControls)
+            c.Visible = isStartup;
+        if (isStartup && !autoStartLoaded)
+            LoadAutoStartState();
+
         foreach (Control c in msimeControls)
             c.Visible = isMsIme;
 
@@ -1303,6 +1442,9 @@ public class ConfigForm : Form
         LoadExtendedSettings();
         if (extChanged)
             RenderCategory(selectedCategoryIndex);
+
+        // 自動起動（スタートアップ / タスクスケジューラ）。設定ファイルではなく、直接登録・削除する
+        ApplyAutoStartSelection();
 
         Debug.WriteLine("設定を保存しました");
         return true;
