@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 // 設定項目の「検証ルール」（キー名・型・範囲・許容値）。
 // 既定値はここに持たない。既定値はひな形ファイル（AlwaysIME.dll.config.default）だけが持つ。
@@ -12,6 +13,7 @@ static class ConfigSchema
         Float,       // 小数 Min～Max
         OneOf,       // Allowed のいずれか（大文字小文字は区別しない）
         IntPair,     // "a,b"（各値は 0～Max）
+        RegexList,   // カンマ区切りの正規表現（各項目が正規表現として正しいこと。空欄可）
     }
 
     private sealed class Rule
@@ -27,6 +29,7 @@ static class ConfigSchema
     private static Rule Int(int min, int max, bool allowEmpty = false) => new Rule { Kind = Kind.Int, Min = min, Max = max, AllowEmpty = allowEmpty };
     private static Rule Float(double min, double max, bool allowEmpty = false) => new Rule { Kind = Kind.Float, Min = min, Max = max, AllowEmpty = allowEmpty };
     private static Rule OneOf(bool allowEmpty, params string[] allowed) => new Rule { Kind = Kind.OneOf, Allowed = allowed, AllowEmpty = allowEmpty };
+    private static Rule RegexList() => new Rule { Kind = Kind.RegexList, AllowEmpty = true };
     private static Rule IntPair(int max) => new Rule { Kind = Kind.IntPair, Max = max, AllowEmpty = true };
 
     // 設定ファイルの全キー（表示・補完・書き戻しの順序もこの並び）
@@ -38,8 +41,8 @@ static class ConfigSchema
         ("AppExitEnd", OneOf(false, "0", "1")),
         ("PassList", Text()),
         ("ImeOffList", Text()),
-        ("ImeOffTitle", Text()),
-        ("UpdateTag", Text()),
+        ("ImeOffTitle", RegexList()),
+        ("UpdateTag", RegexList()),
         ("NoKeyInputTime", Float(0, 1440)),                             // 分。(int)(分*60*1000)が桁あふれしない範囲
         ("SuspendFewTime", Int(0, 1440)),                               // 分
         ("SuspendTime", Int(0, 1440)),                                  // 分
@@ -142,6 +145,21 @@ static class ConfigSchema
                     if (!int.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n) || n < 0 || n > rule.Max)
                     {
                         return $"各値は0～{rule.Max}の整数にしてください";
+                    }
+                }
+                return null;
+
+            case Kind.RegexList:
+                // アプリと同じ分割（カンマ区切り、空の項目は無視）で、各項目を正規表現として検証する
+                foreach (string pattern in value.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    try
+                    {
+                        _ = new Regex(pattern);
+                    }
+                    catch (ArgumentException ex)
+                    {
+                        return $"正規表現として不正です: {pattern}（{ex.Message}）";
                     }
                 }
                 return null;

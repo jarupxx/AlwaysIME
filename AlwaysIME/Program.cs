@@ -532,37 +532,52 @@ class ResidentTest : Form
         {
             DelayBackgroundInterval = (int)(ParseDouble(buff) * 60 * 1000 / imeInterval);
         }
-        List[OnActivatedAppArray] = SplitList(GetSetting("OnActivatedAppList"));
-        buff = GetSetting("OnActivatedAppPath");
-        if (buff.Length > 0)
+        // 連携アプリ。管理者権限で動作しているときは、起動しない。
+        // 起動したアプリも管理者権限で動くため、設定ファイルの書き換えで権限を昇格できてしまうからである。
+        // 設定値の検証は行うが、一覧とパスは反映しない（クリア状態のままにする）。
+        string onActivatedList = GetSetting("OnActivatedAppList");
+        string onActivatedPath = GetSetting("OnActivatedAppPath");
+        string onActivatedArgv = GetSetting("OnActivatedArgv");
+        string backgroundList = GetSetting("BackgroundAppList");
+        string backgroundPath = GetSetting("BackgroundAppPath");
+        string backgroundArgv = GetSetting("BackgroundArgv");
+        if (AppLog.IsElevatedProcess)
         {
-            if (!File.Exists(buff))
+            if (onActivatedPath.Length > 0 || backgroundPath.Length > 0)
             {
-                MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
-            }
-            else
-            {
-                RunOnActivatedAppPath = buff;
+                AppLog.Warn("管理者権限で動作しているため、連携アプリは起動しません");
             }
         }
-        buff = GetSetting("OnActivatedArgv");
-        RunOnActivatedArgv = buff.Length > 0 ? buff : null;
-        List[BackgroundArray] = SplitList(GetSetting("BackgroundAppList"));
-        buff = GetSetting("BackgroundAppPath");
-        if (buff.Length > 0)
+        else
         {
-            if (!File.Exists(buff))
+            List[OnActivatedAppArray] = SplitList(onActivatedList);
+            if (onActivatedPath.Length > 0)
             {
-                MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
-                ScheduleRunBackgroundApp = false;
+                if (!File.Exists(onActivatedPath))
+                {
+                    MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
+                }
+                else
+                {
+                    RunOnActivatedAppPath = onActivatedPath;
+                }
             }
-            else
+            RunOnActivatedArgv = onActivatedArgv.Length > 0 ? onActivatedArgv : null;
+            List[BackgroundArray] = SplitList(backgroundList);
+            if (backgroundPath.Length > 0)
             {
-                RunBackgroundAppPath = buff;
+                if (!File.Exists(backgroundPath))
+                {
+                    MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
+                    ScheduleRunBackgroundApp = false;
+                }
+                else
+                {
+                    RunBackgroundAppPath = backgroundPath;
+                }
             }
+            FWBackgroundArgv = backgroundArgv.Length > 0 ? backgroundArgv : null;
         }
-        buff = GetSetting("BackgroundArgv");
-        FWBackgroundArgv = buff.Length > 0 ? buff : null;
 
         // MS-IME入力設定(スペース/句読点切替)の有効/無効
         // "0" のときだけ、レジストリへの書き込みと切替を行わない。
@@ -1480,6 +1495,11 @@ class ResidentTest : Form
     }
     private void MonitorOnActivated(int param)
     {
+        // 管理者権限では、連携アプリを起動しない
+        if (AppLog.IsElevatedProcess)
+        {
+            return;
+        }
         if (List[param] != null)
         {
             if (!string.IsNullOrEmpty(foregroundprocessName))
@@ -1509,6 +1529,11 @@ class ResidentTest : Form
     }
     private void RunBackgroundApp()
     {
+        // 管理者権限では、連携アプリを起動しない
+        if (AppLog.IsElevatedProcess)
+        {
+            return;
+        }
         delayRunBackgroundApp--;
         if (delayRunBackgroundApp == 0)
         {
