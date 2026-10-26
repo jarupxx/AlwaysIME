@@ -10,7 +10,10 @@ using System.Xml.Linq;
 // Windowsへのログオン時にAlwaysIMEを自動で起動する仕組み。
 //  方法1: スタートアップフォルダーにショートカットを作成する
 //  方法2: タスクスケジューラに「ログオン時」のタスクを登録する（ログオンの10秒後に起動）
-// どちらも現在のユーザーだけが対象で、管理者権限は不要。2つの方法は同時に使わない
+//  方法3: 方法2のタスクを「最上位の特権で実行する」で登録する（管理者権限で動くウィンドウを操作するため）
+// どれも現在のユーザーだけが対象。方法1と方法2は、管理者権限は不要。
+// 方法3の登録・変更・解除は、AlwaysIMEを管理者として起動しているときだけできる（通常権限からは、登録内容を読むだけ）。
+// 2つの方法は同時に使わない
 // （2つ目のインスタンスは再起動シグナルを送るため、二重に起動すると動作が乱れる）。
 //
 // 登録の有無は、設定ファイルではなく実際のショートカット／タスクで判断する。
@@ -20,17 +23,23 @@ enum AutoStartMode
     None,
     StartupFolder,
     TaskScheduler,
+    TaskSchedulerElevated,   // タスクスケジューラ（最上位の特権で実行する）
 }
 
 sealed class AutoStartState
 {
     public bool ShortcutExists;
     public bool? TaskExists;       // nullは、タスクスケジューラの状態を確認できなかった場合
+    public bool? TaskElevated;     // タスクが「最上位の特権」で登録されているか。nullは、確認できなかった場合
     public bool Conflict => ShortcutExists && TaskExists == true;
     public AutoStartMode Mode =>
-        TaskExists == true ? AutoStartMode.TaskScheduler
+        TaskExists == true ? (TaskElevated == true ? AutoStartMode.TaskSchedulerElevated : AutoStartMode.TaskScheduler)
         : ShortcutExists ? AutoStartMode.StartupFolder
         : AutoStartMode.None;
+
+    // 管理者権限で登録されていて、いまのプロセスが通常権限のため、変更できない
+    public bool LockedForCurrentProcess =>
+        Mode == AutoStartMode.TaskSchedulerElevated && !AppLog.IsElevatedProcess;
 }
 
 static class AutoStart
@@ -67,10 +76,15 @@ static class AutoStart
             AppLog.Warn("スタートアップのショートカットを確認できませんでした", ex);
         }
 
-        int code = RunSchtasks($"/Query /TN \"{GetTaskName()}\"", out string output);
+        // /XML で登録内容を取得する（通常権限でも読める）。RunLevel が HighestAvailable なら、最上位の特権で登録されている
+        int code = RunSchtasks($"/Query /TN \"{GetTaskName()}\" /XML", out string output);
         if (code == 0)
         {
             state.TaskExists = true;
+            Match level = Regex.Match(output, @"<RunLevel>\s*(\w+)\s*</RunLevel>");
+            state.TaskElevated = level.Success
+                ? string.Equals(level.Groups[1].Value, "HighestAvailable", StringComparison.OrdinalIgnoreCase)
+                : (bool?)null;
         }
         else if (code > 0)
         {
@@ -96,16 +110,30 @@ static class AutoStart
         var problems = new List<string>();
         try
         {
+            // 管理者権限の登録は、管理者権限のプロセスだけが変更できる
+            if (!AppLog.IsElevatedProcess)
+            {
+                if (mode == AutoStartMode.TaskSchedulerElevated)
+                {
+                    throw new InvalidOperationException("管理者権限での自動起動は、AlwaysIMEを管理者として起動しているときだけ登録できます。");
+                }
+                if (Detect().Mode == AutoStartMode.TaskSchedulerElevated)
+                {
+                    throw new InvalidOperationException("管理者権限で登録された自動起動は、AlwaysIMEを管理者として起動して変更してください。");
+                }
+            }
+
             string exe = mode == AutoStartMode.None ? null : GetExePath();
+            bool isTask = mode == AutoStartMode.TaskScheduler || mode == AutoStartMode.TaskSchedulerElevated;
 
             // 失敗したときに今の登録を失わないよう、選んだ方法を先に登録する
             if (mode == AutoStartMode.StartupFolder)
             {
                 CreateShortcut(exe);
             }
-            else if (mode == AutoStartMode.TaskScheduler)
+            else if (isTask)
             {
-                CreateTask(exe);
+                CreateTask(exe, mode == AutoStartMode.TaskSchedulerElevated);
             }
             SaveHint(mode, exe);
 
@@ -113,7 +141,7 @@ static class AutoStart
             {
                 TryRemoveShortcut(problems);
             }
-            if (mode != AutoStartMode.TaskScheduler)
+            if (!isTask)
             {
                 TryRemoveTask(problems);
             }
@@ -151,9 +179,15 @@ static class AutoStart
             }
 
             AutoStartMode mode = modeText == "task" ? AutoStartMode.TaskScheduler
+                : modeText == "task-admin" ? AutoStartMode.TaskSchedulerElevated
                 : modeText == "startup" ? AutoStartMode.StartupFolder
                 : AutoStartMode.None;
             if (mode == AutoStartMode.None)
+            {
+                return;
+            }
+            // 管理者権限の登録は、通常権限のプロセスからは更新できない
+            if (mode == AutoStartMode.TaskSchedulerElevated && !AppLog.IsElevatedProcess)
             {
                 return;
             }
@@ -191,8 +225,38 @@ static class AutoStart
         {
             case AutoStartMode.StartupFolder: return "スタートアップのショートカット";
             case AutoStartMode.TaskScheduler: return "タスクスケジューラ";
+            case AutoStartMode.TaskSchedulerElevated: return "タスクスケジューラ（管理者権限）";
             default: return "自動起動しない";
         }
+    }
+
+    // 実行ファイルが、管理者しか書き換えられない場所（Program Files、Windows）にあるか。
+    // 最上位の特権で自動起動する場合、ユーザー権限で書き換えられる場所の実行ファイルは、差し替えによって管理者権限を得られてしまう。
+    internal static bool IsProtectedInstallLocation()
+    {
+        try
+        {
+            string dir = Path.GetFullPath(Path.GetDirectoryName(GetExePath()) ?? "");
+            var roots = new[]
+            {
+                Environment.SpecialFolder.ProgramFiles,
+                Environment.SpecialFolder.ProgramFilesX86,
+                Environment.SpecialFolder.Windows,
+            };
+            foreach (var folder in roots)
+            {
+                string root = Environment.GetFolderPath(folder);
+                if (root.Length > 0 && dir.StartsWith(root.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+        }
+        catch
+        {
+            // 判定できなければ、保護されていないものとして扱う
+        }
+        return false;
     }
 
     private static string GetExePath()
@@ -309,8 +373,8 @@ static class AutoStart
         return MakeTaskName(Environment.UserName, sid);
     }
 
-    // ログオン時に、現在のユーザー権限（昇格なし）で起動するタスクのXML
-    internal static string BuildTaskXml(string user, string exePath)
+    // ログオン時に起動するタスクのXML。elevated が true なら「最上位の特権で実行する」、false なら現在のユーザー権限（昇格なし）
+    internal static string BuildTaskXml(string user, string exePath, bool elevated = false)
     {
         XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
         var task = new XElement(ns + "Task",
@@ -327,7 +391,7 @@ static class AutoStart
                     new XAttribute("id", "Author"),
                     new XElement(ns + "UserId", user),
                     new XElement(ns + "LogonType", "InteractiveToken"),
-                    new XElement(ns + "RunLevel", "LeastPrivilege"))),
+                    new XElement(ns + "RunLevel", elevated ? "HighestAvailable" : "LeastPrivilege"))),
             new XElement(ns + "Settings",
                 new XElement(ns + "MultipleInstancesPolicy", "IgnoreNew"),
                 new XElement(ns + "DisallowStartIfOnBatteries", "false"),
@@ -354,7 +418,7 @@ static class AutoStart
         return "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\r\n" + task.ToString();
     }
 
-    private static void CreateTask(string exePath)
+    private static void CreateTask(string exePath, bool elevated)
     {
         string user;
         using (WindowsIdentity id = WindowsIdentity.GetCurrent())
@@ -366,7 +430,7 @@ static class AutoStart
         try
         {
             // schtasks.exe はUTF-16のXMLを受け付ける
-            File.WriteAllText(xmlPath, BuildTaskXml(user, exePath), Encoding.Unicode);
+            File.WriteAllText(xmlPath, BuildTaskXml(user, exePath, elevated), Encoding.Unicode);
             int code = RunSchtasks($"/Create /TN \"{GetTaskName()}\" /XML \"{xmlPath}\" /F", out string output);
             if (code != 0)
             {
@@ -484,7 +548,10 @@ static class AutoStart
                 }
                 else
                 {
-                    key.SetValue(HintModeValue, mode == AutoStartMode.TaskScheduler ? "task" : "startup");
+                    key.SetValue(HintModeValue,
+                        mode == AutoStartMode.TaskScheduler ? "task"
+                        : mode == AutoStartMode.TaskSchedulerElevated ? "task-admin"
+                        : "startup");
                     key.SetValue(HintPathValue, exePath);
                 }
             }

@@ -140,7 +140,7 @@ public class ConfigForm : Form
     private Control[] logControls;
 
     // 自動起動パネル（登録の有無は、設定ファイルではなく実際のショートカット/タスクで判断する）
-    private RadioButton rbAutoNone, rbAutoStartup, rbAutoTask;
+    private RadioButton rbAutoNone, rbAutoStartup, rbAutoTask, rbAutoTaskAdmin;
     private Label lblAutoStatus;
     private Control[] startupControls;
 
@@ -651,36 +651,48 @@ public class ConfigForm : Form
         rbAutoStartup = new RadioButton
         {
             Text = "スタートアップにショートカットを作成する",
-            Location = new Point(RX, panelTop + (int)(32 * uiScale)),
+            Location = new Point(RX, panelTop + (int)(26 * uiScale)),
             Size = new Size(RW, (int)(24 * uiScale)),
         };
         Label hintStartup = MakeMsImeLabel(
-            "Windowsへのログオン後、すぐに起動します。\r\nショートカットは、現在のユーザーの「スタートアップ」フォルダーに作成されます。",
-            hintX, panelTop + (int)(58 * uiScale), hintW, (int)(36 * uiScale));
+            "Windowsへのログオン後、すぐに起動します。\r\n現在のユーザーの「スタートアップ」フォルダーにショートカットを作成します。",
+            hintX, panelTop + (int)(50 * uiScale), hintW, (int)(34 * uiScale));
         rbAutoTask = new RadioButton
         {
             Text = "タスクスケジューラに登録する",
-            Location = new Point(RX, panelTop + (int)(104 * uiScale)),
+            Location = new Point(RX, panelTop + (int)(88 * uiScale)),
             Size = new Size(RW, (int)(24 * uiScale)),
         };
         Label hintTask = MakeMsImeLabel(
-            "ログオンの10秒後に起動します。ログオン直後の混雑を避けたい場合に向いています。\r\n管理者権限は不要ですが、組織の設定によっては登録できない場合があります。",
-            hintX, panelTop + (int)(130 * uiScale), hintW, (int)(50 * uiScale));
+            "ログオンの10秒後に起動します。管理者権限は不要です。\r\n組織の設定によっては、登録できない場合があります。",
+            hintX, panelTop + (int)(112 * uiScale), hintW, (int)(34 * uiScale));
+        rbAutoTaskAdmin = new RadioButton
+        {
+            Text = "タスクスケジューラに登録する（管理者権限で実行）",
+            Location = new Point(RX, panelTop + (int)(150 * uiScale)),
+            Size = new Size(RW, (int)(24 * uiScale)),
+        };
+        Label hintTaskAdmin = MakeMsImeLabel(
+            "管理者権限で動くウィンドウでも、IMEを制御できます。\r\n" +
+            "AlwaysIMEを管理者として起動しているときだけ、選べます。\r\n" +
+            "管理者権限で動いている間は、連携アプリを起動しません。",
+            hintX, panelTop + (int)(174 * uiScale), hintW, (int)(50 * uiScale));
         lblAutoStatus = new Label
         {
-            Location = new Point(RX, panelTop + (int)(190 * uiScale)),
-            Size = new Size(RW, (int)(40 * uiScale)),
+            Location = new Point(RX, panelTop + (int)(228 * uiScale)),
+            Size = new Size(RW, (int)(34 * uiScale)),
             Font = extBoldFont,
         };
         Label autoNote = MakeMsImeLabel(
             "※ 2つの方法は同時に使えません。選ばなかった方法の登録は削除します。\r\n" +
             "※ 実行ファイルを移動すると、次回の起動時に登録内容を自動で更新します。\r\n" +
             "※ 変更は「保存して閉じる」または「適用」を押すと反映されます。",
-            RX, panelTop + (int)(236 * uiScale), RW, (int)(66 * uiScale));
+            RX, panelTop + (int)(266 * uiScale), RW, (int)(48 * uiScale));
 
         startupControls = new Control[]
         {
-            rbAutoNone, rbAutoStartup, hintStartup, rbAutoTask, hintTask, lblAutoStatus, autoNote,
+            rbAutoNone, rbAutoStartup, hintStartup, rbAutoTask, hintTask,
+            rbAutoTaskAdmin, hintTaskAdmin, lblAutoStatus, autoNote,
         };
         this.Controls.AddRange(startupControls);
 
@@ -1001,12 +1013,28 @@ public class ConfigForm : Form
             rbAutoNone.Checked = state.Mode == AutoStartMode.None;
             rbAutoStartup.Checked = state.Mode == AutoStartMode.StartupFolder;
             rbAutoTask.Checked = state.Mode == AutoStartMode.TaskScheduler;
+            rbAutoTaskAdmin.Checked = state.Mode == AutoStartMode.TaskSchedulerElevated;
+
+            // 管理者権限での登録は、管理者として起動した AlwaysIME だけが変更できる。
+            //  ・管理者権限で登録済み、かつ通常権限で起動中 : すべての選択肢を無効にして、現在の状態を表示する
+            //  ・それ以外で通常権限で起動中                : 「管理者権限で実行」だけを無効にする
+            bool locked = state.LockedForCurrentProcess;
+            rbAutoNone.Enabled = !locked;
+            rbAutoStartup.Enabled = !locked;
+            rbAutoTask.Enabled = !locked;
+            rbAutoTaskAdmin.Enabled = AppLog.IsElevatedProcess;
+            if (locked)
+                rbAutoTaskAdmin.Enabled = false;
 
             string text;
             if (state.Conflict)
                 text = "現在の状態: スタートアップとタスクスケジューラの両方に登録されています。\r\n保存すると、選んだ方法だけにします。";
             else if (state.Mode == AutoStartMode.StartupFolder)
                 text = "現在の状態: スタートアップにショートカットがあります。";
+            else if (state.Mode == AutoStartMode.TaskSchedulerElevated)
+                text = locked
+                    ? "現在の状態: タスクスケジューラに、管理者権限で登録されています。\r\n変更するには、AlwaysIMEを管理者として起動してください。"
+                    : "現在の状態: タスクスケジューラに、管理者権限で登録されています。";
             else if (state.Mode == AutoStartMode.TaskScheduler)
                 text = "現在の状態: タスクスケジューラに登録されています。";
             else
@@ -1027,11 +1055,31 @@ public class ConfigForm : Form
         if (!autoStartLoaded)
             return;
 
-        AutoStartMode selected = rbAutoTask.Checked ? AutoStartMode.TaskScheduler
+        AutoStartMode selected = rbAutoTaskAdmin.Checked ? AutoStartMode.TaskSchedulerElevated
+            : rbAutoTask.Checked ? AutoStartMode.TaskScheduler
             : rbAutoStartup.Checked ? AutoStartMode.StartupFolder
             : AutoStartMode.None;
         if (selected == loadedAutoStartMode && !autoStartConflict)
             return;
+
+        // 管理者権限で自動起動する実行ファイルが、ユーザー権限で書き換えられる場所にあると、
+        // 差し替えによって管理者権限を得られてしまう。登録する前に、確認する。
+        if (selected == AutoStartMode.TaskSchedulerElevated && !AutoStart.IsProtectedInstallLocation())
+        {
+            string dir = Path.GetDirectoryName(Environment.ProcessPath) ?? "";
+            DialogResult answer = MessageBox.Show(this,
+                "この実行ファイルの場所は、通常のユーザー権限で書き換えられる可能性があります。\n" +
+                "管理者権限で自動起動する場合、実行ファイルを差し替えられると、管理者権限で実行されるおそれがあります。\n\n" +
+                $"場所: {dir}\n\n" +
+                "Program Filesなど、管理者だけが書き換えられる場所に置くことを勧めます。\n" +
+                "このまま登録しますか？",
+                "AlwaysIME", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
+            if (answer != DialogResult.Yes)
+            {
+                LoadAutoStartState();   // 選択を、実際の登録状態に戻す
+                return;
+            }
+        }
 
         Cursor previous = this.Cursor;
         this.Cursor = Cursors.WaitCursor;
