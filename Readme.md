@@ -1,4 +1,5 @@
 # AlwaysIME
+<img width="472" height="666" alt="AlwaysIMEの4コマ漫画" src="https://github.com/user-attachments/assets/2bab68cb-b733-40d7-9427-7ff4a00c2890" />
 
 ## 概要
 
