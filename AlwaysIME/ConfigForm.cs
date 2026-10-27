@@ -326,7 +326,7 @@ public class ConfigForm : Form
         {
             Location = new Point(RX + (int)(64 * uiScale), panelTop),
             Size = new Size((int)(80 * uiScale), (int)(24 * uiScale)),
-            Minimum = 1,
+            Minimum = 6,   // 6秒 = 0.1分（NoKeyInputTime の下限）
             Maximum = 3600,
             Value = 45,
         };
