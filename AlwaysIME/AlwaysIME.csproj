@@ -41,10 +41,13 @@
     <None Update="Resources\Green.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="Resources\AlwaysIME 仕様書.md">
+    <None Update="Resources\AlwaysIME_仕様書.md">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="Resources\AlwaysIME 設定キー一覧.md">
+    <None Update="Resources\AlwaysIME_設定キー一覧.md">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\AlwaysIME_説明書.md">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <None Update="AlwaysIME.dll.config.default" CopyToOutputDirectory="PreserveNewest" />
