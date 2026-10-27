@@ -1424,7 +1424,12 @@ class ResidentTest : Form
             if (!noKeyInput)
             {
                 Debug.WriteLine($"{noKeyInputInterval / 1000}秒間キーボードやマウス入力がありません");
-                if (CheckforegroundprocessName(ImeOffArray))
+                // メインの判定と同じ基準で復元する（アプリ名とタイトルの両方を見る）。
+                // モード2では一覧が「オンにする例外」なので、オフ/オンを逆にする
+                bool listed = CheckforegroundprocessName(ImeOffArray)
+                    || CheckforegroundWindowTitleRegex(ImeOffTitleArray);
+                bool wantOff = ListMeansOn ? !listed : listed;
+                if (wantOff)
                 {
                     SetImeOffList();
                 }
