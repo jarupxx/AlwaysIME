@@ -62,7 +62,7 @@ static class BackupService
     public enum RestoreScope
     {
         All,         // すべての設定
-        ListsOnly,   // アプリ一覧・連携設定のみ
+        ListsOnly,   // アプリ一覧のみ
         ExceptLists, // それ以外の設定のみ
     }
 
@@ -74,12 +74,10 @@ static class BackupService
         public DateTime SavedUtc; // 表示用（新旧の判定には使わない）
     }
 
-    // 「アプリ一覧・連携設定」として扱うキー
+    // 「アプリ一覧」として扱うキー
     private static readonly HashSet<string> ListSettingKeys = new HashSet<string>
     {
         "PassList", "ImeOffList", "ImeOffTitle", "UpdateTag",
-        "OnActivatedAppList", "OnActivatedAppPath", "OnActivatedArgv",
-        "BackgroundAppList", "BackgroundAppPath", "BackgroundArgv",
     };
 
     private static readonly object gate = new object();

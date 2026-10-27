@@ -140,12 +140,10 @@ class ResidentTest : Form
     private ToolStripSeparator separatorPunct;
     private ToolStripSeparator separatorSpace;
     private static ResidentTest currentInstance;
-    const int ICON_RED = 0;
     const int ICON_GREEN = 1;
     const int ICON_GRAY = 2;
     static int previousIconColor = ICON_GREEN;
     static string previousWindowTitle;
-    static string previousprocessName;
     static string RegistrationprocessName;
     const int IMEMODE_ON = 1;
     const int IMEMODE_OFF = 2;
@@ -162,32 +160,20 @@ class ResidentTest : Form
     internal static bool AppExitEndEnabled = true;
     static bool changeIme = false;
     static bool noKeyInput = false;
-    static bool flagOnActivated = false;
-    static bool ScheduleRunBackgroundApp = false;
-    static int delayRunBackgroundApp = 2147483647;
     static string foregroundprocessName;
     private static string foregroundWindowTitle;
     static string RegistrationWindowTitle;
-    internal static readonly string[][] List = new string[6][];
+    internal static readonly string[][] List = new string[4][];
     internal const int PassArray = 0;
     internal const int ImeOffArray = 1;
     internal const int ImeOffTitleArray = 2;
     internal const int RemoveUpdateTagArray = 3;
-    const int OnActivatedAppArray = 4;
-    const int BackgroundArray = 5;
-    private static string RunOnActivatedAppPath;
-    private static string RunOnActivatedArgv;
-    private static string RunBackgroundAppPath;
-    private static string FWBackgroundArgv;
     // 次の4つは既定値を持たない。起動時に InitializeAppConfig() が、検証済みの設定値で必ず設定する
     // （既定値はひな形ファイルだけが持つ）
     private static int imeInterval;
     private static int SuspendFewInterval;
     private static int SuspendInterval;
     internal static int noKeyInputInterval;
-    // 未設定（遅延起動しない）を表す値。「既定値」ではなく「クリア状態」
-    private const int DelayBackgroundDisabled = int.MaxValue;
-    private static int DelayBackgroundInterval = DelayBackgroundDisabled;
     private DateTime lastInputTime;
     IntPtr imwd;
     int imeConvMode = 0;
@@ -494,15 +480,8 @@ class ResidentTest : Form
         List[ImeOffArray] = null;
         List[ImeOffTitleArray] = null;
         List[RemoveUpdateTagArray] = null;
-        List[OnActivatedAppArray] = null;
-        List[BackgroundArray] = null;
         val[ConfigPunctuation] = [0, 0];
         val[ConfigSpaceWidth] = [0, 0];
-        RunOnActivatedAppPath = null;
-        RunOnActivatedArgv = null;
-        RunBackgroundAppPath = null;
-        FWBackgroundArgv = null;
-        DelayBackgroundInterval = DelayBackgroundDisabled;
         keyPath[ConfigPunctuation] = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
         valueName[ConfigPunctuation] = "option1";
         valueType[ConfigPunctuation] = RegistryValueKind.DWord;
@@ -534,57 +513,6 @@ class ResidentTest : Form
         SuspendFewInterval = ParseInt(GetSetting("SuspendFewTime"));
         SuspendInterval = ParseInt(GetSetting("SuspendTime"));
         noKeyInputInterval = (int)Math.Round(ParseDouble(GetSetting("NoKeyInputTime")) * 60 * 1000);
-        buff = GetSetting("DelayBackgroundTime");
-        if (buff.Length > 0)
-        {
-            DelayBackgroundInterval = (int)(ParseDouble(buff) * 60 * 1000 / imeInterval);
-        }
-        // 連携アプリ。管理者権限で動作しているときは、起動しない。
-        // 起動したアプリも管理者権限で動くため、設定ファイルの書き換えで権限を昇格できてしまうからである。
-        // 設定値の検証は行うが、一覧とパスは反映しない（クリア状態のままにする）。
-        string onActivatedList = GetSetting("OnActivatedAppList");
-        string onActivatedPath = GetSetting("OnActivatedAppPath");
-        string onActivatedArgv = GetSetting("OnActivatedArgv");
-        string backgroundList = GetSetting("BackgroundAppList");
-        string backgroundPath = GetSetting("BackgroundAppPath");
-        string backgroundArgv = GetSetting("BackgroundArgv");
-        if (AppLog.IsElevatedProcess)
-        {
-            if (onActivatedPath.Length > 0 || backgroundPath.Length > 0)
-            {
-                AppLog.Warn("管理者権限で動作しているため、連携アプリは起動しません");
-            }
-        }
-        else
-        {
-            List[OnActivatedAppArray] = SplitList(onActivatedList);
-            if (onActivatedPath.Length > 0)
-            {
-                if (!File.Exists(onActivatedPath))
-                {
-                    MessageBox.Show("OnActivatedAppPath に指定したアプリが見つかりません");
-                }
-                else
-                {
-                    RunOnActivatedAppPath = onActivatedPath;
-                }
-            }
-            RunOnActivatedArgv = onActivatedArgv.Length > 0 ? onActivatedArgv : null;
-            List[BackgroundArray] = SplitList(backgroundList);
-            if (backgroundPath.Length > 0)
-            {
-                if (!File.Exists(backgroundPath))
-                {
-                    MessageBox.Show("BackgroundAppPath に指定したアプリが見つかりません");
-                    ScheduleRunBackgroundApp = false;
-                }
-                else
-                {
-                    RunBackgroundAppPath = backgroundPath;
-                }
-            }
-            FWBackgroundArgv = backgroundArgv.Length > 0 ? backgroundArgv : null;
-        }
 
         // MS-IME入力設定(スペース/句読点切替)の有効/無効
         // "0" のときだけ、レジストリへの書き込みと切替を行わない。
@@ -798,11 +726,6 @@ class ResidentTest : Form
 
         if (result == DialogResult.Yes)
         {
-            if (ScheduleRunBackgroundApp)
-            {
-                delayRunBackgroundApp = 1;
-                RunBackgroundApp();
-            }
             if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
             {
                 SetPunctuationMode = val[ConfigPunctuation][1];
@@ -1306,19 +1229,13 @@ class ResidentTest : Form
     private void Timer_Tick(object sender, EventArgs e)
     {
         MonitorActiveWindow();
-        RunBackgroundApp();
     }
     private void SetIcon(int param)
     {
-        if (ScheduleRunBackgroundApp && param == ICON_GREEN)
-            param = ICON_RED;
         if (previousIconColor != param)
         {
             switch (param)
             {
-                case ICON_RED:
-                    icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
-                    break;
                 case ICON_GRAY:
                     icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
                     break;
@@ -1355,23 +1272,6 @@ class ResidentTest : Form
                 if (Regex.IsMatch(foregroundWindowTitle, List[param][i]))
                 {
                     return true;
-                }
-            }
-        }
-        return false;
-    }
-    private bool CheckpreviousprocessName(int param)
-    {
-        if (List[param] != null)
-        {
-            if (!string.IsNullOrEmpty(previousprocessName))
-            {
-                for (int i = 0; i < List[param].Length; i++)
-                {
-                    if (previousprocessName.Equals(List[param][i], StringComparison.CurrentCultureIgnoreCase))
-                    {
-                        return true;
-                    }
                 }
             }
         }
@@ -1511,62 +1411,6 @@ class ResidentTest : Form
             changeIme = false;
         }
     }
-    private void MonitorOnActivated(int param)
-    {
-        // 管理者権限では、連携アプリを起動しない
-        if (AppLog.IsElevatedProcess)
-        {
-            return;
-        }
-        if (List[param] != null)
-        {
-            if (!string.IsNullOrEmpty(foregroundprocessName))
-            {
-                if (!flagOnActivated)
-                {
-                    AppLog.Info("連携アプリを起動します: " + Path.GetFileName(RunOnActivatedAppPath));
-                    Process.Start(RunOnActivatedAppPath, RunOnActivatedArgv);
-                    flagOnActivated = true;
-                    SetIcon(ICON_RED);
-                }
-            }
-        }
-    }
-    private void MonitorBackground(int param)
-    {
-        // 利用状況が分かる情報のため、ファイルログには出さない（デバッガー専用）
-        Debug.WriteLine($"{previousprocessName},{foregroundprocessName}");
-        // 非アクティブになってから指定回数ループで解除する
-        if (List[param] != null)
-        {
-            delayRunBackgroundApp = DelayBackgroundInterval;
-            SetIcon(ICON_RED);
-            ScheduleRunBackgroundApp = true;
-            Debug.WriteLine("Set ScheduleRunBackgroundApp = true;");
-        }
-    }
-    private void RunBackgroundApp()
-    {
-        // 管理者権限では、連携アプリを起動しない
-        if (AppLog.IsElevatedProcess)
-        {
-            return;
-        }
-        delayRunBackgroundApp--;
-        if (delayRunBackgroundApp == 0)
-        {
-            // 何日かすると桁あふれするのでリセットする
-            delayRunBackgroundApp = 2147483647;
-            if (ScheduleRunBackgroundApp)
-            {
-                // 非アクティブならFirewallを解除する
-                Process.Start(RunBackgroundAppPath, FWBackgroundArgv);
-                ScheduleRunBackgroundApp = false;
-                SetIcon(ICON_GREEN);
-                Debug.WriteLine("時間経過により連携アプリが起動します");
-            }
-        }
-    }
     static object ReadRegistryValue(RegistryHive hive, string keyPath, string valueName, RegistryValueKind valueType)
     {
         using (var regKey = RegistryKey.OpenBaseKey(hive, RegistryView.Default).OpenSubKey(keyPath))
@@ -1634,8 +1478,6 @@ class ResidentTest : Form
         // キーボードやマウス未入力ならIMEの状態を復元する
         CheckLastKeyInput();
 
-        // プロセスの変更を追跡するために保存する
-        previousprocessName = foregroundprocessName;
         // アクティブウィンドウが変更された場合、IMEの状態を復元する
         IntPtr foregroundWindowHandle = GetForegroundWindow();
         if (foregroundWindowHandle != IntPtr.Zero)
@@ -1702,20 +1544,6 @@ class ResidentTest : Form
             Debug.WriteLine($"{foregroundprocessName} はPassListに含まれています");
             SetIcon(ICON_GRAY);
             return;
-        }
-        if (CheckforegroundprocessName(OnActivatedAppArray))
-        {
-            Debug.WriteLine($"{foregroundprocessName} はOnActivatedAppListに含まれています");
-            MonitorOnActivated(OnActivatedAppArray);
-        }
-        else
-        {
-            flagOnActivated = false;
-        }
-        if (CheckpreviousprocessName(BackgroundArray))
-        {
-            Debug.WriteLine($"{previousprocessName} はBackgroundAppListに含まれています");
-            MonitorBackground(BackgroundArray);
         }
         if (string.IsNullOrEmpty(foregroundWindowTitle))
         {
