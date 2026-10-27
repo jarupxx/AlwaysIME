@@ -1,5 +1,12 @@
 # AlwaysIME
-<img width="472" height="666" alt="AlwaysIMEの4コマ漫画" src="https://github.com/user-attachments/assets/2bab68cb-b733-40d7-9427-7ff4a00c2890" />
+<div align="center">
+  <img
+    src="https://github.com/user-attachments/assets/2bab68cb-b733-40d7-9427-7ff4a00c2890"
+    alt="AlwaysIMEの4コマ漫画 画像生成：Canva（AI）"
+    width="472"
+  />
+  <p>画像生成：Canva（AI）</p>
+</div>
 
 ## 概要
 
