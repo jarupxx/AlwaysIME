@@ -37,15 +37,15 @@ static class ConfigSchema
     {
         ("AlwaysIMEMode", OneOf(false, "1", "2", "3", "on", "off")),   // on/off は旧バージョンとの互換
         ("IsDarkMode", OneOf(false, "on", "off")),
-        ("intervalTime", Int(10, 6000)),                                // ミリ秒。Timer.Intervalは0より大きい必要がある
+        ("intervalTime", Int(30, 6000)),                                // ミリ秒
         ("AppExitEnd", OneOf(false, "0", "1")),
         ("PassList", Text()),
         ("ImeOffList", Text()),
         ("ImeOffTitle", RegexList()),
         ("UpdateTag", RegexList()),
-        ("NoKeyInputTime", Float(0, 1440)),                             // 分。(int)(分*60*1000)が桁あふれしない範囲
-        ("SuspendFewTime", Int(0, 1440)),                               // 分
-        ("SuspendTime", Int(0, 1440)),                                  // 分
+        ("NoKeyInputTime", Float(0.1, 1440)),                           // 分。(int)(分*60*1000)が桁あふれしない範囲
+        ("SuspendFewTime", Int(1, 1440)),                               // 分
+        ("SuspendTime", Int(1, 1440)),                                  // 分
         ("MsImeSwitch", OneOf(false, "0", "1")),
         ("Punctuation", IntPair(3)),                                    // 空欄 = 切り替えない
         ("SpaceWidth", IntPair(2)),                                     // 空欄 = 切り替えない
