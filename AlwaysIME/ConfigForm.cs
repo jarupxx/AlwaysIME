@@ -171,7 +171,7 @@ public class ConfigForm : Form
     // バックアップパネル
     private static readonly double[] BackupHoursChoices = [1, 6, 12, 24, 48, 72];
     private static readonly int[] BackupKeepChoices = [3, 5, 10, 20, 50];
-    private static readonly string[] RestoreScopeLabels = ["すべての設定", "アプリ一覧・連携設定のみ", "それ以外の設定のみ"];
+    private static readonly string[] RestoreScopeLabels = ["すべての設定", "アプリ一覧のみ", "それ以外の設定のみ"];
     // リンクの色（通常モード / ダークモードそれぞれの背景で読みやすい緑）
     private static readonly Color BackupLinkColor = Color.FromArgb(26, 127, 55);
     private static readonly Color BackupLinkColorDark = Color.FromArgb(63, 185, 80);
@@ -206,13 +206,6 @@ public class ConfigForm : Form
         { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。" },
         { "SuspendTime", "トレイメニュー「しばらく無効」で、機能を停止する時間です（分）。" },
         { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
-        { "DelayBackgroundTime", "BackgroundAppList のアプリが非アクティブになってから、連携アプリ（BackgroundAppPath）を起動するまでの時間です（分）。\n空欄の場合は無効です。" },
-        { "OnActivatedAppList", "アクティブになったときに連携アプリ（OnActivatedAppPath）を起動するアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。" },
-        { "OnActivatedAppPath", "OnActivatedAppList のアプリがアクティブになったときに起動する連携アプリのパスです。\n存在しないパスを指定すると警告が表示されます。" },
-        { "OnActivatedArgv", "OnActivatedAppPath の連携アプリに渡すコマンドライン引数です。" },
-        { "BackgroundAppList", "非アクティブになったときに連携アプリ（BackgroundAppPath）の起動を予約するアプリです。\n実行ファイル名（拡張子なし）をカンマ区切りで指定します。" },
-        { "BackgroundAppPath", "BackgroundAppList のアプリが非アクティブになり、DelayBackgroundTime が経過したときに起動する連携アプリのパスです。\n存在しないパスを指定すると警告が表示されます。" },
-        { "BackgroundArgv", "BackgroundAppPath の連携アプリに渡すコマンドライン引数です。" },
         { "Punctuation", "MS-IMEの句読点を「初期値,切替先」の形式で指定します。\n0: ，．  1: 、。  2: 、．  3: ，。\n例: 1,3\n※ MsImeSwitch が 1 のときに有効です。" },
         { "SpaceWidth", "MS-IMEのスペース入力を「初期値,切替先」の形式で指定します。\n0: 現在の入力モード  1: 常に全角  2: 常に半角\n例: 1,2\n※ MsImeSwitch が 1 のときに有効です。" },
         { "MsImeSwitch", "スペース / 句読点の切替を有効にするかどうかです。\n1: 有効（トレイメニューから切替できます）\n0: 無効（レジストリへの書き込みを行いません）" },
@@ -684,9 +677,8 @@ public class ConfigForm : Form
         };
         Label hintTaskAdmin = MakeMsImeLabel(
             "管理者権限で動くウィンドウでも、IMEを制御できます。\r\n" +
-            "AlwaysIMEを管理者として起動しているときだけ、選べます。\r\n" +
-            "管理者権限で動いている間は、連携アプリを起動しません。",
-            hintX, panelTop + (int)(174 * uiScale), hintW, (int)(50 * uiScale));
+            "AlwaysIMEを管理者として起動しているときだけ、選べます。",
+            hintX, panelTop + (int)(174 * uiScale), hintW, (int)(34 * uiScale));
         lblAutoStatus = new Label
         {
             Location = new Point(RX, panelTop + (int)(228 * uiScale)),

@@ -46,13 +46,6 @@ static class ConfigSchema
         ("NoKeyInputTime", Float(0, 1440)),                             // 分。(int)(分*60*1000)が桁あふれしない範囲
         ("SuspendFewTime", Int(0, 1440)),                               // 分
         ("SuspendTime", Int(0, 1440)),                                  // 分
-        ("OnActivatedAppList", Text()),
-        ("OnActivatedAppPath", Text()),                                 // 存在確認は環境依存のため、ここでは行わない
-        ("OnActivatedArgv", Text()),
-        ("BackgroundAppList", Text()),
-        ("BackgroundAppPath", Text()),
-        ("BackgroundArgv", Text()),
-        ("DelayBackgroundTime", Float(0, 1440, allowEmpty: true)),      // 空欄 = 遅延起動しない
         ("MsImeSwitch", OneOf(false, "0", "1")),
         ("Punctuation", IntPair(3)),                                    // 空欄 = 切り替えない
         ("SpaceWidth", IntPair(2)),                                     // 空欄 = 切り替えない
