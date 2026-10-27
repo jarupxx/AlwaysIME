@@ -135,6 +135,7 @@ class ResidentTest : Form
     private NotifyIcon icon;
     private int iconsize;
     private ToolStripMenuItem menuPunctuation;
+    private ToolStripMenuItem menuRegistration;
     private ToolStripMenuItem menuSpace;
     private ToolStripSeparator separatorPunct;
     private ToolStripSeparator separatorSpace;
@@ -150,6 +151,12 @@ class ResidentTest : Form
     const int IMEMODE_OFF = 2;
     const int IMEMODE_GLOBAL = 3;
     static int ImeModeGlobal = IMEMODE_ON;
+    // モード2（既定がIMEオフ）では、ImeOffList / ImeOffTitle に載せたものが例外として「IMEオン」になる。
+    // 設定キー名は互換性のため変えず、画面上の表記だけをモードに合わせる
+    internal static bool ListMeansOn => ImeModeGlobal == IMEMODE_OFF;
+    internal static string ListStateText => ListMeansOn ? "オン" : "オフ";
+    internal static string ListStateTag => ListMeansOn ? "ON" : "OFF";
+    internal static string RegistrationLabel => "IME" + ListStateText + "に登録";
     internal static bool darkModeEnabled = false;
     static bool previousimeEnabled = true;
     internal static bool AppExitEndEnabled = true;
@@ -768,6 +775,10 @@ class ResidentTest : Form
     // トレイメニューの句読点/スペース切替項目の表示・文言を現在の設定に合わせる
     private void UpdateMsImeMenu()
     {
+        if (menuRegistration != null)
+        {
+            menuRegistration.Text = RegistrationLabel;
+        }
         bool punctSwitch = val[ConfigPunctuation][0] != val[ConfigPunctuation][1];
         bool spaceSwitch = val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1];
         // クリックしたときに適用される値を表示する
@@ -887,8 +898,9 @@ class ResidentTest : Form
         MenuItemShowConfig.Click += MenuItemShowConfig_Click;
 
         ToolStripMenuItem MenuItemRegistrationDialog = new ToolStripMenuItem();
-        MenuItemRegistrationDialog.Text = "IMEオフに登録";
+        MenuItemRegistrationDialog.Text = RegistrationLabel; // モード変更時は UpdateMsImeMenu() で更新
         MenuItemRegistrationDialog.Click += MenuItemRegistrationDialog_Click;
+        menuRegistration = MenuItemRegistrationDialog;
 
         ToolStripMenuItem MenuItemReload = new ToolStripMenuItem();
         MenuItemReload.Text = "設定の再読み込み";
@@ -1013,7 +1025,7 @@ class ResidentTest : Form
             using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
                 UIScale = graphics.DpiX / 96;
             this.Font = new Font("Meiryo", (int)(9 * Math.Pow(UIScale, 1.0 / 3.0)), FontStyle.Regular);
-            this.Text = "IMEオフに登録";
+            this.Text = RegistrationLabel;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -1278,6 +1290,7 @@ class ResidentTest : Form
         ConfigurationManager.RefreshSection("appSettings");
 
         ImeModeGlobal = mode;
+        UpdateMsImeMenu();
     }
     private void ChangeIntervalAndSave(int interval)
     {

@@ -19,6 +19,11 @@ public class ConfigForm : Form
         public int ListIndex = -1;     // "list"タイプの場合、List[] 配列のインデックス
     }
 
+    // モード2では一覧が「例外（IMEオン）」になることを説明に添える（設定キー名はImeOffList/ImeOffTitleのまま）
+    private static string ModeNote => ResidentTest.ListMeansOn
+        ? "\r\n（IMEの制御モードが2のため、IMEは通常オフで、ここに載せたものだけオンになります）"
+        : "";
+
     private readonly ConfigCategory[] categories = new ConfigCategory[]
     {
         new ConfigCategory
@@ -32,16 +37,16 @@ public class ConfigForm : Form
         new ConfigCategory
         {
             AppSettingKey = "ImeOffList",
-            Label = "IME-OFFアプリ",
-            Desc = "アプリの切り替えやウィンドウタイトルの変化時に、IMEをOFFにするアプリです。\r\n実行ファイル名（拡張子なし）を1行1件で入力してください。\r\n例: cmd, powershell",
+            Label = "IME-" + ResidentTest.ListStateTag + "アプリ",
+            Desc = "アプリの切り替えやウィンドウタイトルの変化時に、IMEを" + ResidentTest.ListStateText + "にするアプリです。" + ModeNote + "\r\n実行ファイル名（拡張子なし）を1行1件で入力してください。\r\n例: cmd, powershell",
             Type = "list",
             ListIndex = ResidentTest.ImeOffArray,
         },
         new ConfigCategory
         {
             AppSettingKey = "ImeOffTitle",
-            Label = "IME-OFFタイトルパターン",
-            Desc = "ウィンドウタイトルにマッチしたら、IMEをOFFにする正規表現です。\r\n1行1パターン、全アプリ共通で適用されます。\r\n例: \\.cs$",
+            Label = "IME-" + ResidentTest.ListStateTag + "タイトルパターン",
+            Desc = "ウィンドウタイトルにマッチしたら、IMEを" + ResidentTest.ListStateText + "にする正規表現です。" + ModeNote + "\r\n1行1パターン、全アプリ共通で適用されます。\r\n例: \\.cs$",
             Type = "list",
             ListIndex = ResidentTest.ImeOffTitleArray,
         },
@@ -113,6 +118,8 @@ public class ConfigForm : Form
     // ---- コントロール ----
     private ListBox catList;
     private Label descLabel;
+    // 説明文が長いときにリスト編集パネルをずらすための基準値（コンストラクターで設定）
+    private int descBaseHeight, listBaseTop, listBaseHeight;
 
     private ListBox itemList;
     private Button btnEdit, btnDelete, btnUp, btnDown;
@@ -284,6 +291,8 @@ public class ConfigForm : Form
 
         int panelTop = SP + (int)(60 * uiScale);
         int panelHeight = H - panelTop - (int)(48 * uiScale);
+        descBaseHeight = descLabel.Height;
+        listBaseTop = panelTop;
 
         // ---- リスト編集パネル ----
         int btnW = (int)(76 * uiScale);
@@ -291,6 +300,7 @@ public class ConfigForm : Form
         itemList.Location = new Point(RX, panelTop);
         itemList.Size = new Size(RW - btnW - SP, panelHeight - (int)(32 * uiScale));
         itemList.IntegralHeight = false;
+        listBaseHeight = itemList.Height;
         itemList.DoubleClick += (s, e) => StartEdit();
         this.Controls.Add(itemList);
 
@@ -1326,6 +1336,15 @@ public class ConfigForm : Form
         string description = ConfigDescriptions.TryGetValue(key, out string d)
             ? d
             : "この項目の説明はありません。";
+        if (key == "ImeOffList" || key == "ImeOffTitle")
+        {
+            // モード2では一覧のものが「IMEオン」になるため、説明の「オフ」を現在のモードに合わせる
+            description = description.Replace("オフにする", ResidentTest.ListStateText + "にする");
+            if (ResidentTest.ListMeansOn)
+            {
+                description += "\n※ AlwaysIMEMode=2のため、IMEは通常オフで、ここに載せたものだけオンになります。";
+            }
+        }
         string defaultText = hasDefault
             ? (defaultValue.Length == 0 ? "初期値: （空欄）" : "初期値: " + defaultValue)
             : "初期値: （なし）";
@@ -1426,6 +1445,26 @@ public class ConfigForm : Form
         RenderCategory(idx);
     }
 
+    // 説明文が既定の高さ（約3行）に収まらないとき、説明ラベルを広げ、その分だけリストと操作ボタンを下げる。
+    // 下段の入力欄は動かさず、リストの高さを縮めて収める
+    private void FitListPanelToDescription()
+    {
+        int needed = TextRenderer.MeasureText(descLabel.Text, descLabel.Font,
+            new Size(descLabel.Width, int.MaxValue), TextFormatFlags.WordBreak).Height + (int)(4 * uiScale);
+        int extra = Math.Max(0, needed - descBaseHeight);
+        // リストが小さくなりすぎないよう、ずらす量には上限を設ける
+        extra = Math.Min(extra, Math.Max(0, listBaseHeight - (int)(80 * uiScale)));
+
+        descLabel.Height = descBaseHeight + extra;
+        int top = listBaseTop + extra;
+        itemList.Top = top;
+        itemList.Height = listBaseHeight - extra;
+        btnEdit.Top = top;
+        btnDelete.Top = top + (int)(28 * uiScale);
+        btnUp.Top = top + (int)(60 * uiScale);
+        btnDown.Top = top + (int)(88 * uiScale);
+    }
+
     private void RenderCategory(int idx)
     {
         catList.SelectedIndexChanged -= CatList_SelectedIndexChanged;
@@ -1436,6 +1475,14 @@ public class ConfigForm : Form
         descLabel.Text = cat.Desc;
 
         bool isList = cat.Type == "list";
+        if (isList)
+        {
+            FitListPanelToDescription();
+        }
+        else
+        {
+            descLabel.Height = descBaseHeight;
+        }
         bool isSeconds = cat.Type == "seconds";
         bool isAdvanced = cat.Type == "advanced";
         bool isMsIme = cat.Type == "msime";
