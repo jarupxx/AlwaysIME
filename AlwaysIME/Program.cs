@@ -140,7 +140,6 @@ class ResidentTest : Form
     private ToolStripSeparator separatorPunct;
     private ToolStripSeparator separatorSpace;
     private static ResidentTest currentInstance;
-    const int ICON_RED = 0;
     const int ICON_GREEN = 1;
     const int ICON_GRAY = 2;
     static int previousIconColor = ICON_GREEN;
@@ -1237,9 +1236,6 @@ class ResidentTest : Form
         {
             switch (param)
             {
-                case ICON_RED:
-                    icon.Icon = new Icon("Resources\\Red.ico", iconsize, iconsize);
-                    break;
                 case ICON_GRAY:
                     icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
                     break;
