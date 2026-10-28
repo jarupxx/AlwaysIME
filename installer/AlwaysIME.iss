@@ -1,6 +1,6 @@
 ﻿; AlwaysIME インストーラー（Inno Setup 6.3 以上。7.x でもコンパイルできる書き方にしてある）
 ; ビルド: installer\build.ps1（dotnet publish のあと、このスクリプトを ISCC でコンパイルします）
-; 個別に実行する場合: ISCC /DMyAppVersion=0.6.8 /DPublishDir=publish AlwaysIME.iss
+; 個別に実行する場合: ISCC /DMyAppVersion=0.6.9 /DPublishDir=publish AlwaysIME.iss
 ;
 ; 方針
 ;  ・既定は、現在のユーザーだけに入れます（管理者権限は不要。%LOCALAPPDATA%\Programs\AlwaysIME）。

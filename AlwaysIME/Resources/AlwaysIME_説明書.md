@@ -30,7 +30,7 @@ AlwaysIMEは、Windowsのタスクトレイに常駐して、IMEの状態を制�
 サイレントインストール（社内配布など）の例です。
 
 ```powershell
-AlwaysIME-0.6.8-x64-setup.exe /VERYSILENT /NORESTART
+AlwaysIME-0.6.9-x64-setup.exe /VERYSILENT /NORESTART
 ```
 
 - `/VERYSILENT`: 画面を出さずに、インストールします。
