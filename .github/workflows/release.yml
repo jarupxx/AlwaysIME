@@ -33,9 +33,23 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path publish/* -DestinationPath AlwaysIME-${{ github.ref_name }}-win-x64.zip
 
+      - name: Setup Inno Setup 7
+        id: inno
+        uses: ./.github/actions/setup-inno-setup
+
+      # zip と同じ publish フォルダーから、インストーラーを作る。
+      # タグ（v0.6.8）が、csproj の VersionPrefix と一致しないときは、ここで失敗する
+      - name: Build installer
+        shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
+        run: ./installer/build.ps1 -Iscc "${{ steps.inno.outputs.iscc }}" -PublishDir publish -Tag $env:TAG
+
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: AlwaysIME-${{ github.ref_name }}-win-x64.zip
+          files: |
+            AlwaysIME-${{ github.ref_name }}-win-x64.zip
+            installer/Output/AlwaysIME-*-x64-setup.exe
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}

@@ -1,0 +1,53 @@
+name: Setup Inno Setup
+description: Download, verify and install Inno Setup 7 (64-bit edition), and output the path of ISCC.exe
+
+inputs:
+  version:
+    description: Inno Setup version to install (for example 7.1.0)
+    required: false
+    default: '7.1.0'
+
+outputs:
+  iscc:
+    description: Full path of ISCC.exe
+    value: ${{ steps.install.outputs.iscc }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: pwsh
+      env:
+        INNO_VERSION: ${{ inputs.version }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+
+        # 例: 7.1.0 -> タグ is-7_1_0、ファイル innosetup-7.1.0-x64.exe
+        $tag  = 'is-' + $env:INNO_VERSION.Replace('.', '_')
+        $file = "innosetup-$($env:INNO_VERSION)-x64.exe"
+        $url  = "https://github.com/jrsoftware/issrc/releases/download/$tag/$file"
+        $installer = Join-Path $env:RUNNER_TEMP $file
+
+        Write-Host "Downloading $url"
+        Invoke-WebRequest -Uri $url -OutFile $installer
+
+        # 配布元はインストーラーに Pyrsys B.V. の署名を付けている。署名が有効で、発行元が一致することを確認する
+        $sig = Get-AuthenticodeSignature -FilePath $installer
+        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Pyrsys B\.V\.') {
+          throw "Unexpected signature on ${file}: status=$($sig.Status) subject=$($sig.SignerCertificate.Subject)"
+        }
+
+        # インストール先を固定して、ISCC.exe のパスを確実に決める
+        $dir = Join-Path $env:RUNNER_TEMP 'InnoSetup7'
+        $p = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @(
+          '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', "/DIR=`"$dir`""
+        )
+        if ($p.ExitCode -ne 0) { throw "Inno Setup installer failed: exit code $($p.ExitCode)" }
+
+        $iscc = Join-Path $dir 'ISCC.exe'
+        if (-not (Test-Path -LiteralPath $iscc)) { throw "ISCC.exe was not found: $iscc" }
+
+        & $iscc --version
+        if ($LASTEXITCODE -ne 0) { Write-Warning "ISCC --version returned $LASTEXITCODE" }
+
+        "iscc=$iscc" >> $env:GITHUB_OUTPUT

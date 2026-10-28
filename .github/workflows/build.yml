@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: windows-latest
@@ -17,3 +20,18 @@ jobs:
 
       - run: dotnet restore
       - run: dotnet build -c Release --no-restore
+
+      # インストーラーのスクリプトが、Inno Setup 7 でコンパイルできることを確認する
+      - name: Setup Inno Setup 7
+        id: inno
+        uses: ./.github/actions/setup-inno-setup
+
+      - name: Build installer
+        shell: pwsh
+        run: ./installer/build.ps1 -Iscc "${{ steps.inno.outputs.iscc }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AlwaysIME-setup
+          path: installer/Output/*-setup.exe
+          retention-days: 7
