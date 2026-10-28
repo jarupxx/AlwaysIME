@@ -1,6 +1,6 @@
 # AlwaysIME 仕様書
 
-下書き ｜ 2026-10-28 ｜ 対象: 設定ファイルの管理、設定画面、バックアップ、ログ
+2026-10-28 ｜ 対象: 設定ファイルの管理、設定画面、バックアップ、ログ、インストーラーと配布
 
 ※ 設定キーの詳細は「AlwaysIME 設定キー一覧」を参照してください。
 
@@ -14,10 +14,12 @@ AlwaysIMEは、Windowsのタスクトレイに常駐し、IMEの状態を監視�
 - 一定時間、キーボードやマウスの入力が無いと、IMEの制御状態を復元します。
 - MS-IMEのスペースと句読点の入力を、レジストリ経由で切り替えられます（Windows 11の新しいIME専用）。
 - 設定のバックアップと復元、動作ログ、自動起動の登録を備えます。
+- インストーラー（Inno Setup）、winget、zipで配布します。
 
 ### 動作環境と前提
 
-- Windows 10とWindows 11で動作します。
+- Windows 10とWindows 11で動作します。.NET 10の対応OSの一覧に載っているWindowsが対象です（一般的なWindows 10 22H2は、載っていません）。
+- 実行には、.NET 10 デスクトップ ランタイム（x64）が必要です。
 - 「MS-IME入力設定」は、Windows 11の新しいMS-IME専用です。互換モードでは動作しません。ATOKやGoogle日本語入力では動作せず、対応の予定もありません。非対応のIMEを選んでいるときは、パネルの下部に警告を表示します（設定は無効になりません）。
 - 管理者権限は不要です（自動起動の登録も、現在のユーザーのみが対象です）。
 
@@ -222,7 +224,30 @@ flowchart TD
 - 管理者権限で動いているかは、トレイアイコンのツールチップ（「AlwaysIME（管理者）」）、設定画面のタイトル（「AlwaysIME 設定（管理者）」）、バージョン情報の「実行権限」で分かります。管理者権限で動かすのは、必要な場合に限ってください。
 - マニフェストの uiAccess を使う方法は、署名と信頼された場所（Program Filesなど）への配置が必要です。zip配布のポータブルな使い方には合わないため、対象外です。
 
-## 11. コマンドライン引数
+## 11. インストーラーと配布
+
+### 配布形態
+
+| 形態 | 内容 |
+| --- | --- |
+| インストーラー | Inno Setup。`AlwaysIME-バージョン-x64-setup.exe`。GitHub Releasesで配布します |
+| winget | 上のインストーラーを、wingetのマニフェストから参照します。パッケージIDは `jarupxx.AlwaysIME` です |
+| zip | 展開するだけで使えます。`AlwaysIME.portable` を置くと、ポータブルとして動作します |
+
+x64のみです。ARM64のWindows 11では、x64のエミュレーションで動作します。
+
+### インストーラーの動作
+
+- **権限とインストール先**: 既定は、現在のユーザーだけに入れます（管理者権限は不要。`%LOCALAPPDATA%\Programs\AlwaysIME`）。画面の選択、またはコマンドラインの `/ALLUSERS` で、全ユーザー向け（Program Files）にできます。
+- **含めないファイル**: `AlwaysIME.dll.config`（利用者の設定）、`AlwaysIME.portable`（あると、ポータブル動作になるため）、`*.pdb`。
+- **設定とログ**: インストール先に `AlwaysIME.dll.config` も `AlwaysIME.portable` も無いため、初回起動で、ユーザー別（`%AppData%\AlwaysIME`）として作られます。更新でも、アンインストールでも、消しません。
+- **更新（上書き）**: ファイルをコピーする前に、起動中のAlwaysIMEを `--exit` で正常に終了させます。終了できないときは、インストールを中止して、手動で終了するよう案内します。更新後は、対話式なら、最後の画面で起動を選べます。サイレントなら、更新前に起動していた場合だけ、起動し直します。
+- **ランタイムの確認**: .NET 10 デスクトップ ランタイム（x64）が見つからないときは、対話式なら警告して、続けるかを確認します。サイレントなら、何も表示せず続けます（wingetでは、依存パッケージとして先に入ります）。
+- **アンインストール**: `--exit` で終了させて、`--remove-autostart` で自動起動の登録を解除します。管理者権限で登録された自動起動は、解除できません。
+- **強制終了をしない理由**: 終了時に、MS-IMEのスペース、句読点、キー割り当てを元に戻すためです。強制終了をすると、戻らないことがあります。
+- **AppId**: バージョンが変わっても、変えません。変えると、別のアプリとして扱われ、更新できなくなります。
+
+### コマンドライン引数
 
 インストーラーなどの管理用です。どちらも、常駐は開始しません。
 
@@ -232,3 +257,23 @@ flowchart TD
 | `--remove-autostart` | 自動起動（スタートアップ、タスクスケジューラ）の登録を解除します | 0: 解除した / 1: 解除できなかった（管理者権限で登録されている場合など） |
 
 終了の要求は、名前付きイベント（`AlwaysIME_ExitSignal`）で届きます。再起動の要求（`AlwaysIME_RestartSignal`）と同じ仕組みです。
+
+### wingetのマニフェスト
+
+| 項目 | 値 |
+| --- | --- |
+| PackageIdentifier | `jarupxx.AlwaysIME` |
+| InstallerType | `inno`（サイレント用のスイッチは、wingetが自動で付けます） |
+| Scope | `user` |
+| 依存パッケージ | `Microsoft.DotNet.DesktopRuntime.10` |
+| ProductCode | `{AppId}_is1` |
+| 保存場所 | `winget\manifests\j\jarupxx\AlwaysIME\<バージョン>\`（version、installer、defaultLocale（en-US）、locale（ja-JP）の4ファイル） |
+
+### リリースの手順
+
+1. `AlwaysIME.csproj` の `VersionPrefix` を更新します。
+2. `installer\build.ps1` を実行します。`dotnet publish` のあと、インストーラーを作り、SHA256を表示します。
+3. インストーラーを、GitHub Releasesにアップロードします。
+4. マニフェストの `PackageVersion`、`InstallerUrl`、`InstallerSha256`、`ReleaseNotesUrl` を更新します。`wingetcreate update jarupxx.AlwaysIME --version <バージョン> --urls <URL>` で、ハッシュも含めて更新できます。
+5. `winget validate <マニフェストのフォルダー>` で書式を確認し、`winget install --manifest <マニフェストのフォルダー>` で、インストールを試します（ローカルのマニフェストを使うには、`winget settings --enable LocalManifestFiles` が必要な場合があります）。
+6. `microsoft/winget-pkgs` にプルリクエストを送ります。

@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+#
+# 公開前に、次の2か所を実物に合わせる（wingetcreate update / winget hash を使うと自動で埋まる）
+#   InstallerUrl    GitHub Releases に置いたインストーラーの実際のURL（タグ名に注意）
+#   InstallerSha256 そのファイルのSHA256（installer\build.ps1 の最後にも表示される）
+
+PackageIdentifier: jarupxx.AlwaysIME
+PackageVersion: 0.6.9
+InstallerType: inno
+Scope: user
+InstallModes:
+- interactive
+- silent
+- silentWithProgress
+UpgradeBehavior: install
+MinimumOSVersion: 10.0.0.0
+ProductCode: '{3C391D6A-BAFD-4E22-8B2C-C7C7E02E0459}_is1'
+Dependencies:
+  PackageDependencies:
+  - PackageIdentifier: Microsoft.DotNet.DesktopRuntime.10
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/jarupxx/AlwaysIME/releases/download/v0.6.9/AlwaysIME-0.6.9-x64-setup.exe
+  InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+ManifestType: installer
+ManifestVersion: 1.12.0
