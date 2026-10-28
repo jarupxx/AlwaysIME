@@ -30,7 +30,7 @@ AlwaysIME は、Windows のタスクトレイに常駐し、アプリに合わ�
 
 ## 設定・詳細説明
 
-設定画面で、IME を切り替えるアプリやタイトル、未入力タイムアウト、自動起動などを設定できます。詳しくは [`Resources/AlwaysIME 説明書.md`](Resources/AlwaysIME%20説明書.md) をご覧ください。
+設定画面で、IME を切り替えるアプリやタイトル、未入力タイムアウト、自動起動などを設定できます。詳しくは [`Resources/AlwaysIME_説明書.md`](AlwaysIME/Resources/AlwaysIME_説明書.) をご覧ください。
 
 ## 動作環境と制限
 
