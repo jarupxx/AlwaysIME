@@ -38,3 +38,4 @@ jobs:
         with:
           files: AlwaysIME-${{ github.ref_name }}-win-x64.zip
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
