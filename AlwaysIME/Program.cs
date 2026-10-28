@@ -19,10 +19,28 @@ class MainWindow
     static EventWaitHandle restartSignalEvent;
     const string RestartSignalEventName = "AlwaysIME_RestartSignal";
     static RegisteredWaitHandle restartSignalRegisteredWait;
+    static EventWaitHandle exitSignalEvent;
+    const string ExitSignalEventName = "AlwaysIME_ExitSignal";
+    static RegisteredWaitHandle exitSignalRegisteredWait;
+    static ResidentTest residentForm;
 
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
+        // インストーラーなどから呼ばれる管理用コマンド（常駐は開始しない）
+        //   --exit              起動中のAlwaysIMEを、「常駐の終了」と同じ手順で終了させる
+        //   --remove-autostart  自動起動の登録（スタートアップ、タスクスケジューラ）を解除する
+        if (HasArgument(args, "--exit"))
+        {
+            Environment.ExitCode = RunExitCommand();
+            return;
+        }
+        if (HasArgument(args, "--remove-autostart"))
+        {
+            Environment.ExitCode = RunRemoveAutoStartCommand();
+            return;
+        }
+
         bool createdNew;
         mutex = new Mutex(true, "AlwaysIME", out createdNew);
 
@@ -67,6 +85,8 @@ class MainWindow
             }
             ResidentTest.InitializeAppConfig();
             ResidentTest rm = new ResidentTest();
+            residentForm = rm;
+            _ = rm.Handle; // 別スレッドからの終了要求を、UIスレッドへ渡せるようにする（表示はしない）
             WatchForRestartSignal();
             // 実行ファイルを移動していた場合に、自動起動の登録を新しい場所へ更新する（起動を遅らせないよう別スレッドで行う）
             Task.Run(AutoStart.VerifyRegisteredPath);
@@ -75,6 +95,8 @@ class MainWindow
             BackupService.OnExit();
             restartSignalRegisteredWait?.Unregister(null);
             restartSignalEvent?.Dispose();
+            exitSignalRegisteredWait?.Unregister(null);
+            exitSignalEvent?.Dispose();
             mutex.ReleaseMutex();
         }
         else
@@ -109,6 +131,147 @@ class MainWindow
             null,
             Timeout.Infinite,
             executeOnlyOnce: false);
+
+        exitSignalEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ExitSignalEventName);
+        exitSignalRegisteredWait = ThreadPool.RegisterWaitForSingleObject(
+            exitSignalEvent,
+            (state, timedOut) => OnExitSignalReceived(),
+            null,
+            Timeout.Infinite,
+            executeOnlyOnce: false);
+    }
+
+    // --exit で届いた終了要求。確認ダイアログは出さず、メニューの「常駐の終了」と同じ後始末をして終了する
+    static void OnExitSignalReceived()
+    {
+        AppLog.Info("終了要求を受け取りました");
+        try
+        {
+            ResidentTest form = residentForm;
+            form?.BeginInvoke(new Action(form.ExitApplicationNow));
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn("終了要求を処理できませんでした", ex);
+        }
+    }
+
+    static bool HasArgument(string[] args, string name)
+    {
+        return args != null && args.Any(a => string.Equals(a, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // 起動中のAlwaysIMEに終了を求め、終了するまで待つ。戻り値: 0=終了した（または起動していない）、1=終了を確認できなかった
+    static int RunExitCommand()
+    {
+        if (!Mutex.TryOpenExisting("AlwaysIME", out Mutex running))
+        {
+            return 0;
+        }
+        using (running)
+        {
+            // 同じセッションで動いているAlwaysIMEのプロセス（自分は除く）。終了の確認に使う
+            var targets = new List<Process>();
+            try
+            {
+                int session = Process.GetCurrentProcess().SessionId;
+                foreach (Process p in Process.GetProcessesByName("AlwaysIME"))
+                {
+                    if (p.Id != Environment.ProcessId && p.SessionId == session)
+                    {
+                        targets.Add(p);
+                    }
+                    else
+                    {
+                        p.Dispose();
+                    }
+                }
+            }
+            catch
+            {
+                // 取得できなければ、下のミューテックスの待機で確認する
+            }
+
+            // 起動の途中だと、終了用のイベントがまだ無いため、少し待って再試行する
+            EventWaitHandle signal = null;
+            DateTime limit = DateTime.UtcNow.AddSeconds(5);
+            while (signal == null)
+            {
+                try
+                {
+                    signal = EventWaitHandle.OpenExisting(ExitSignalEventName);
+                }
+                catch (WaitHandleCannotBeOpenedException)
+                {
+                    if (DateTime.UtcNow > limit)
+                    {
+                        targets.ForEach(p => p.Dispose());
+                        return 1;
+                    }
+                    Thread.Sleep(100);
+                }
+            }
+            using (signal)
+            {
+                signal.Set();
+            }
+
+            bool exited = true;
+            if (targets.Count > 0)
+            {
+                foreach (Process p in targets)
+                {
+                    try
+                    {
+                        if (!p.WaitForExit(20000))
+                        {
+                            exited = false;
+                        }
+                    }
+                    catch
+                    {
+                        // 待てなかったプロセスは、終了したものとして扱う
+                    }
+                    finally
+                    {
+                        p.Dispose();
+                    }
+                }
+            }
+            else
+            {
+                try
+                {
+                    if (running.WaitOne(TimeSpan.FromSeconds(20)))
+                    {
+                        running.ReleaseMutex();
+                    }
+                    else
+                    {
+                        exited = false;
+                    }
+                }
+                catch (AbandonedMutexException)
+                {
+                    // 相手が終了した
+                }
+            }
+            return exited ? 0 : 1;
+        }
+    }
+
+    // 自動起動の登録を解除する。戻り値: 0=解除した、1=解除できなかった（管理者権限で登録されている場合など）
+    static int RunRemoveAutoStartCommand()
+    {
+        // ログの設定を読めるよう、既存の設定ファイルの場所を使う
+        ConfigStore.TryActivateExisting();
+        AppLog.EnsureLocation();
+        bool ok = AutoStart.TryApply(AutoStartMode.None, out string error);
+        if (!ok)
+        {
+            AppLog.Warn("--remove-autostart: " + error);
+        }
+        return ok ? 0 : 1;
     }
 
     static void OnRestartSignalReceived()
@@ -726,21 +889,33 @@ class ResidentTest : Form
 
         if (result == DialogResult.Yes)
         {
-            if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
-            {
-                SetPunctuationMode = val[ConfigPunctuation][1];
-                Punctuation_Click(this, e);
-            }
-            if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
-            {
-                SetSpaceMode = val[ConfigSpaceWidth][1];
-                Space_Click(this, e);
-            }
-            RestoreKeyAssignment();
-            icon.Visible = false;
-            icon.Dispose();
-            Application.Exit();
+            ExitApplicationNow();
         }
+    }
+    // 終了の後始末（スペース・句読点・キー割り当てを戻す）をして、アプリを終了する。
+    // メニューの「常駐の終了」（確認後）と、--exit の終了要求から呼ばれる。UIスレッドで呼ぶこと
+    private bool exiting;
+    internal void ExitApplicationNow()
+    {
+        if (exiting)
+        {
+            return;
+        }
+        exiting = true;
+        if (val[ConfigPunctuation][0] != val[ConfigPunctuation][1])
+        {
+            SetPunctuationMode = val[ConfigPunctuation][1];
+            Punctuation_Click(this, EventArgs.Empty);
+        }
+        if (val[ConfigSpaceWidth][0] != val[ConfigSpaceWidth][1])
+        {
+            SetSpaceMode = val[ConfigSpaceWidth][1];
+            Space_Click(this, EventArgs.Empty);
+        }
+        RestoreKeyAssignment();
+        icon.Visible = false;
+        icon.Dispose();
+        Application.Exit();
     }
     // ダークモード用のトレイメニュー描画。
     // 標準のレンダラーはセパレーターを背景色と無関係に明るい灰色で描画するため、
