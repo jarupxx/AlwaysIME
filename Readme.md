@@ -22,6 +22,22 @@ AlwaysIME は、Windows のタスクトレイに常駐し、アプリに合わ�
 
 ## はじめかた
 
+### インストーラー（推奨）
+
+1. [GitHub Releases](https://github.com/jarupxx/AlwaysIME/releases) から `AlwaysIME-バージョン-x64-setup.exe` をダウンロードして、実行します（管理者権限は不要です）。
+2. 最後の画面で「AlwaysIMEを起動」を選びます。
+3. タスクトレイのアイコンを右クリックし、「設定を表示」を選びます。
+
+### winget
+
+```powershell
+winget install jarupxx.AlwaysIME
+```
+
+wingetのリポジトリへの登録後に使えます。.NET 10 デスクトップ ランタイムも、あわせてインストールされます。
+
+### ZIP
+
 1. ZIP を、ドキュメントやデスクトップなど**書き込み可能な場所**に展開します。`C:\Program Files` は避けてください。
 2. `AlwaysIME.exe` を起動します。
 3. タスクトレイのアイコンを右クリックし、「設定を表示」を選びます。
@@ -30,7 +46,7 @@ AlwaysIME は、Windows のタスクトレイに常駐し、アプリに合わ�
 
 ## 設定・詳細説明
 
-設定画面で、IME を切り替えるアプリやタイトル、未入力タイムアウト、自動起動などを設定できます。詳しくは [`Resources/AlwaysIME_説明書.md`](AlwaysIME/Resources/AlwaysIME_説明書.) をご覧ください。
+設定画面で、IME を切り替えるアプリやタイトル、未入力タイムアウト、自動起動などを設定できます。詳しくは [`Resources/AlwaysIME_説明書.md`](AlwaysIME/Resources/AlwaysIME_説明書.md) をご覧ください。
 
 ## 動作環境と制限
 
@@ -41,10 +57,10 @@ AlwaysIME は、Windows のタスクトレイに常駐し、アプリに合わ�
 
 ## ランタイム
 
-.NET デスクトップ ランタイム 8.0 が必要です。[ダウンロード](https://dotnet.microsoft.com/ja-jp/download)
+.NET デスクトップ ランタイム 10.0（x64）が必要です。wingetでは、自動でインストールされます。インストーラーは、見つからないと警告します。[ダウンロード](https://dotnet.microsoft.com/ja-jp/download/dotnet/10.0)
 
 ## 更新・ライセンス
 
-更新時は、新しい ZIP を同じ場所に上書き展開してください。設定ファイルはそのまま残ります。ライセンスは MIT License です（同梱の `LICENSE.txt` を参照）。
+更新は、新しいインストーラーを実行するか（`winget upgrade jarupxx.AlwaysIME`）、ZIP 版では新しい ZIP を同じ場所に上書き展開してください。設定ファイルはそのまま残ります。ライセンスは MIT License です（同梱の `LICENSE.txt` を参照）。
 
 [最新版を GitHub Releases から入手](https://github.com/jarupxx/AlwaysIME/releases)

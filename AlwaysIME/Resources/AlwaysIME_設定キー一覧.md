@@ -1,6 +1,6 @@
 # AlwaysIME 設定キー一覧
 
-下書き ｜ 2026-10-28 ｜ 対象: AlwaysIME.dll.config の全21キー
+2026-10-28 ｜ 対象: AlwaysIME.dll.config の全21キー
 
 ※ 「ひな形の値」は、AlwaysIME.dll.config.default の値です。
 
