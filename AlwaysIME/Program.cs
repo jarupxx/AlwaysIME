@@ -922,7 +922,17 @@ class ResidentTest : Form
         RestoreKeyAssignment();
         icon.Visible = false;
         icon.Dispose();
+        DisposeIconCache();
         Application.Exit();
+    }
+    private void DisposeIconCache()
+    {
+        foreach (Icon cached in iconCache.Values.Distinct())
+        {
+            cached.Dispose();
+        }
+
+        iconCache.Clear();
     }
     // ダークモード用のトレイメニュー描画。
     // 標準のレンダラーはセパレーターを背景色と無関係に明るい灰色で描画するため、
