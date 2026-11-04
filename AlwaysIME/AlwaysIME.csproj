@@ -11,6 +11,7 @@
     <Description>IMEオンにするツール</Description>
     <Copyright>Copyright © jarupxx 2024-2026</Copyright>
     <VersionPrefix>0.6.9</VersionPrefix>
+    <VersionSuffix>alpha.2</VersionSuffix>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <NeutralLanguage>ja-JP</NeutralLanguage>
     <ApplicationVisualStyles>true</ApplicationVisualStyles>
