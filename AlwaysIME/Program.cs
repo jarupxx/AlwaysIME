@@ -305,6 +305,7 @@ class ResidentTest : Form
     private static ResidentTest currentInstance;
     const int ICON_GREEN = 1;
     const int ICON_GRAY = 2;
+    const int ICON_ORANGE = 3;
     static int previousIconColor = ICON_GREEN;
     static string previousWindowTitle;
     static string RegistrationprocessName;
@@ -338,6 +339,12 @@ class ResidentTest : Form
     private static int SuspendInterval;
     internal static int noKeyInputInterval;
     private DateTime lastInputTime;
+    // 一時停止中は、その待機を取り消すためのフラグを持つ（null = 停止していない）。
+    // 「少し無効」「しばらく無効」はすべてこの状態を共有する
+    private CancellationTokenSource suspendCts;
+    private DateTime suspendUntil;
+    private bool IsSuspended => suspendCts != null;
+    private readonly Dictionary<int, Icon> iconCache = new Dictionary<int, Icon>();
     IntPtr imwd;
     int imeConvMode = 0;
     bool imeEnabled = false;
@@ -951,9 +958,9 @@ class ResidentTest : Form
         using (Graphics graphics = Graphics.FromHwnd(IntPtr.Zero))
             iconsize = (int)(16 * graphics.DpiX / 96);
         icon = new NotifyIcon();
-        icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
+        icon.Icon = GetIcon(ICON_GREEN);
         icon.Visible = true;
-        icon.Text = AppLog.IsElevatedProcess ? "AlwaysIME（管理者）" : "AlwaysIME";
+        UpdateIconText();
         ContextMenuStrip menu = new ContextMenuStrip();
 
         ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
@@ -1354,30 +1361,78 @@ class ResidentTest : Form
     }
     private void ResumeMenuItem_Click(object sender, EventArgs e)
     {
-        this.timer.Start();
-        SetIcon(ICON_GREEN);
-        AppLog.Info("クリックにより再開しました");
+        Resume("クリック");
     }
     private async void SuspendFewMenuItem_Click(object sender, EventArgs e)
     {
-        await SuspendAsync(TimeSpan.FromMinutes(SuspendFewInterval));
+        await SuspendAsync(TimeSpan.FromMinutes(SuspendFewInterval), "クリック");
     }
     private async void SuspendMenuItem_Click(object sender, EventArgs e)
     {
-        await SuspendAsync(TimeSpan.FromMinutes(SuspendInterval));
+        await SuspendAsync(TimeSpan.FromMinutes(SuspendInterval), "クリック");
     }
 
-    private async Task SuspendAsync(TimeSpan duration)
+    // 自動制御を止め、指定の時間が過ぎたら自動で再開する。
+    // すでに止めている間に呼ばれたときは、前の待機を取り消して、時間を数え直す。
+    private async Task SuspendAsync(TimeSpan duration, string trigger)
     {
-        SetIcon(ICON_GRAY);
-        AppLog.Info($"{duration.TotalMinutes}分間無効にします({DateTime.Now + duration}まで)");
+        CancellationTokenSource previous = suspendCts;
+        var cts = new CancellationTokenSource();
+        suspendCts = cts;
+        suspendUntil = DateTime.Now + duration;
+        previous?.Cancel();
+        previous?.Dispose();
 
         this.timer.Stop();
-        await Task.Delay(duration);
-        this.timer.Start();
+        SetIcon(ICON_ORANGE);
+        UpdateIconText();
+        AppLog.Info($"{trigger}により、{duration.TotalMinutes}分間無効にします({suspendUntil}まで)");
 
+        try
+        {
+            await Task.Delay(duration, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // 再開された、または時間が数え直された。後始末は、取り消した側が済ませている
+            return;
+        }
+
+        // 待機が終わっても、その直前に再開や数え直しが済んでいたら何もしない
+        if (!ReferenceEquals(suspendCts, cts))
+        {
+            return;
+        }
+        suspendCts = null;
+        cts.Dispose();
+        this.timer.Start();
         SetIcon(ICON_GREEN);
-        AppLog.Info("再開しました");
+        UpdateIconText();
+        AppLog.Info("時間が経過したため、再開しました");
+    }
+
+    // 停止中なら再開する（待機中の自動再開も取り消す）。停止していなければ何もしない
+    private void Resume(string trigger)
+    {
+        CancellationTokenSource cts = suspendCts;
+        if (cts == null)
+        {
+            return;
+        }
+        suspendCts = null;
+        cts.Cancel();
+        cts.Dispose();
+        this.timer.Start();
+        SetIcon(ICON_GREEN);
+        UpdateIconText();
+        AppLog.Info($"{trigger}により再開しました");
+    }
+
+    // トレイアイコンにカーソルを合わせたときの表示。一時停止中は、再開する時刻も示す
+    private void UpdateIconText()
+    {
+        string name = AppLog.IsElevatedProcess ? "AlwaysIME（管理者）" : "AlwaysIME";
+        icon.Text = IsSuspended ? $"{name} 一時停止中（{suspendUntil:H:mm}まで）" : name;
     }
     private void ChangeAlwaysIMEModeAndSave(int mode)
     {
@@ -1403,23 +1458,47 @@ class ResidentTest : Form
     }
     private void Timer_Tick(object sender, EventArgs e)
     {
+        if (IsSuspended)
+        {
+            return;
+        }
         MonitorActiveWindow();
     }
     private void SetIcon(int param)
     {
         if (previousIconColor != param)
         {
-            switch (param)
-            {
-                case ICON_GRAY:
-                    icon.Icon = new Icon("Resources\\Gray.ico", iconsize, iconsize);
-                    break;
-                default: /* ICON_GREEN */
-                    icon.Icon = new Icon("Resources\\Green.ico", iconsize, iconsize);
-                    break;
-            }
+            icon.Icon = GetIcon(param);
         }
         previousIconColor = param;
+    }
+    // アイコンは色ごとに1度だけ読み込む。読み込めないときは、状態の違いが分かる別のアイコンで代用する
+    // （一時停止の色が出せなくても、アプリは止めない）
+    private Icon GetIcon(int color)
+    {
+        if (iconCache.TryGetValue(color, out Icon cached))
+        {
+            return cached;
+        }
+        string file = color switch
+        {
+            ICON_GRAY => "Gray.ico",
+            ICON_ORANGE => "Orange.ico",
+            _ => "Green.ico",
+        };
+        Icon loaded;
+        try
+        {
+            loaded = new Icon("Resources\\" + file, iconsize, iconsize);
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warn($"アイコンを読み込めません: {file}", ex);
+            loaded = color == ICON_GREEN ? SystemIcons.Application
+                : GetIcon(color == ICON_ORANGE ? ICON_GRAY : ICON_GREEN);
+        }
+        iconCache[color] = loaded;
+        return loaded;
     }
     private bool CheckforegroundprocessName(int param)
     {
