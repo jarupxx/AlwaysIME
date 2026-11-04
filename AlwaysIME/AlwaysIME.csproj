@@ -32,6 +32,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Resources\Orange.ico">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Resources\Gray.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
