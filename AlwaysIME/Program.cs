@@ -806,6 +806,11 @@ class ResidentTest : Form
     // 変換キー→IME-ON / 無変換キー→IME-OFF の割り当てを有効化・無効化する
     private static void ApplyKeyAssignment(bool enable)
     {
+        if (ImeEnvironment.GetStatus() == ImeEnvironment.Status.CompatMode)
+        {
+            LegacyKeyAssignment.Apply(enable);
+            return;
+        }
         if (!keyAssignmentRecorded)
         {
             origKeyAssignment = ReadMsImeDword("IsKeyAssignmentEnabled") ?? -1;
@@ -835,6 +840,7 @@ class ResidentTest : Form
     // キー割り当てを変更前の値に戻す
     private static void RestoreKeyAssignment()
     {
+        LegacyKeyAssignment.Restore();
         if (!keyAssignmentRecorded)
             return;
         WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "IsKeyAssignmentEnabled", origKeyAssignment >= 0 ? origKeyAssignment : 0, RegistryValueKind.DWord);
