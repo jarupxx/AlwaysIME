@@ -340,10 +340,11 @@ class ResidentTest : Form
     internal static int noKeyInputInterval;
     private DateTime lastInputTime;
     // 一時停止中は、その待機を取り消すためのフラグを持つ（null = 停止していない）。
-    // 「少し無効」「しばらく無効」はすべてこの状態を共有する
+    // 「少し無効」「しばらく無効」「カタカナ・ひらがなキー」はすべてこの状態を共有する
     private CancellationTokenSource suspendCts;
     private DateTime suspendUntil;
     private bool IsSuspended => suspendCts != null;
+    private KanaKeyWatcher kanaKeyWatcher;
     private readonly Dictionary<int, Icon> iconCache = new Dictionary<int, Icon>();
     IntPtr imwd;
     int imeConvMode = 0;
@@ -471,6 +472,31 @@ class ResidentTest : Form
         this.timer.Tick += new EventHandler(Timer_Tick);
         this.timer.Start();
         this.lastInputTime = DateTime.Now;
+    }
+
+    // フォームのハンドルができたら、カタカナ・ひらがなキーの監視を始める
+    // （キーが押されたときの処理を、BeginInvoke でUIスレッドへ渡すため）
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        if (kanaKeyWatcher == null)
+        {
+            kanaKeyWatcher = new KanaKeyWatcher(() =>
+            {
+                try
+                {
+                    if (IsHandleCreated)
+                    {
+                        BeginInvoke(new Action(OnKanaKeyPressed));
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // 終了処理中（ObjectDisposedException も、これに含まれる）
+                }
+            });
+            kanaKeyWatcher.Start();
+        }
     }
 
     // 設定値が不正な場合に確認ダイアログを表示する。
@@ -926,6 +952,7 @@ class ResidentTest : Form
             Space_Click(this, EventArgs.Empty);
         }
         RestoreKeyAssignment();
+        kanaKeyWatcher?.Dispose();
         icon.Visible = false;
         icon.Dispose();
         DisposeIconCache();
@@ -1386,6 +1413,25 @@ class ResidentTest : Form
     private async void SuspendMenuItem_Click(object sender, EventArgs e)
     {
         await SuspendAsync(TimeSpan.FromMinutes(SuspendInterval), "クリック");
+    }
+
+    // カタカナ・ひらがな・ローマ字キーが押されたとき（UIスレッドで呼ぶ）。キー自体の動作（IMEの切り替え）は妨げない。
+    //  動作中: 「しばらく無効」と同じ時間だけ、自動制御を止める
+    //  停止中: 再開する（「少し無効」「しばらく無効」で止めた場合も同じ）
+    private void OnKanaKeyPressed()
+    {
+        if (exiting)
+        {
+            return;
+        }
+        if (IsSuspended)
+        {
+            Resume("カタカナ・ひらがなキー");
+        }
+        else
+        {
+            _ = SuspendAsync(TimeSpan.FromMinutes(SuspendInterval), "カタカナ・ひらがなキー");
+        }
     }
 
     // 自動制御を止め、指定の時間が過ぎたら自動で再開する。
