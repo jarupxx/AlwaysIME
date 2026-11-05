@@ -74,6 +74,13 @@ public class ConfigForm : Form
         },
         new ConfigCategory
         {
+            AppSettingKey = "KanaKeySuspend",
+            Label = "一時停止キー",
+            Desc = "カタカナ・ひらがな・ローマ字キーを押すと、IMEの自動制御を一時停止します。\r\nもう一度押すか、設定した時間が過ぎると再開します。\r\nトレイメニューの「少し無効」「しばらく無効」と同じ停止状態です。",
+            Type = "kanakey",
+        },
+        new ConfigCategory
+        {
             AppSettingKey = null,
             Label = "自動起動",
             Desc = "Windowsへのログオン時に、AlwaysIMEを自動で起動する方法を選びます。\r\n現在のユーザーだけが対象で、管理者権限は不要です。",
@@ -168,6 +175,13 @@ public class ConfigForm : Form
     private Control[] msimeControls;
     private Label lblImeNotice;   // 対応していないIMEを使っているときの警告（MS-IME入力設定の下部）
 
+    // 一時停止キーのパネル（カタカナ・ひらがな・ローマ字キー）
+    private static readonly string[] KanaKeyKindLabels = ["「少し無効」の時間", "「しばらく無効」の時間"];
+    private CheckBox chkKanaKey;
+    private ComboBox cmbKanaKind;
+    private NumericUpDown numSuspendFew, numSuspendLong;
+    private Control[] kanaKeyControls;
+
     // バックアップパネル
     private static readonly double[] BackupHoursChoices = [1, 6, 12, 24, 48, 72];
     private static readonly int[] BackupKeepChoices = [3, 5, 10, 20, 50];
@@ -203,8 +217,9 @@ public class ConfigForm : Form
         { "ImeOffTitle", "ウィンドウタイトルにマッチしたらIMEをオフにする正規表現です。\nカンマ区切りで複数指定でき、全アプリ共通で適用されます。\n例: \\.cs$" },
         { "UpdateTag", "ウィンドウタイトルの変化を判定するときに無視する部分の正規表現です。\nマッチした部分を除去してから変化を判定します。カンマ区切りで複数指定できます。\n例: \\(更新\\)" },
         { "intervalTime", "IMEの状態を監視する間隔です（ミリ秒）。\n小さいほど反応が早くなりますが、負荷が増えます。\n例: 200" },
-        { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。" },
-        { "SuspendTime", "トレイメニュー「しばらく無効」、または「カタカナ・ひらがな・ローマ字キー」で、機能を停止する時間です（分）。\n停止中にそのキーをもう一度押すと、時間を待たずに再開します。" },
+        { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。\nKanaKeySuspend が 1 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
+        { "SuspendTime", "トレイメニュー「しばらく無効」で、機能を停止する時間です（分）。\nKanaKeySuspend が 2 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
+        { "KanaKeySuspend", "カタカナ・ひらがな・ローマ字キーを押したときに、機能を一時停止するかどうかです。停止中にもう一度押すと再開します。\n0: 使わない\n1: 「少し無効」の時間（SuspendFewTime）だけ停止\n2: 「しばらく無効」の時間（SuspendTime）だけ停止\n※ キー自体の動作（IMEの切り替え）は妨げません。" },
         { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
         { "Punctuation", "MS-IMEの句読点を「初期値,切替先」の形式で指定します。\n0: ，．  1: 、。  2: 、．  3: ，。\n例: 1,3\n※ MsImeSwitch が 1 のときに有効です。" },
         { "SpaceWidth", "MS-IMEのスペース入力を「初期値,切替先」の形式で指定します。\n0: 現在の入力モード  1: 常に全角  2: 常に半角\n例: 1,2\n※ MsImeSwitch が 1 のときに有効です。" },
@@ -642,6 +657,78 @@ public class ConfigForm : Form
         };
         this.Controls.AddRange(logControls);
 
+        // ---- 一時停止キーのパネル ----
+        int kcComboW = (int)(RW * 0.42);
+        int kcValueX = RX + RW - kcComboW;
+        int kcLblW = RW - kcComboW - SP;
+        int kcDy = (int)(4 * uiScale);
+        int kcNumW = (int)(80 * uiScale);
+        int kcRowKind = panelTop + (int)(32 * uiScale);
+        int kcRowFew = panelTop + (int)(96 * uiScale);
+        int kcRowLong = panelTop + (int)(124 * uiScale);
+
+        chkKanaKey = new CheckBox
+        {
+            Text = "カタカナ・ひらがな・ローマ字キーで一時停止 / 再開する",
+            Location = new Point(RX, panelTop),
+            Size = new Size(RW, (int)(24 * uiScale)),
+        };
+        chkKanaKey.CheckedChanged += (s, e) => UpdateKanaKeyControlsEnabled();
+        Label lblKanaKind = MakeMsImeLabel("キーを押したときに停止する時間", RX, kcRowKind + kcDy, kcLblW, (int)(20 * uiScale));
+        cmbKanaKind = MakeMsImeCombo(KanaKeyKindLabels, kcValueX, kcRowKind, kcComboW);
+
+        Label kanaSeparator = new Label
+        {
+            BorderStyle = BorderStyle.Fixed3D,
+            Location = new Point(RX, panelTop + (int)(66 * uiScale)),
+            Size = new Size(RW, 2),
+        };
+        Label hdrKanaTime = new Label
+        {
+            Text = "停止時間の長さ（トレイメニューの項目と共通）",
+            Location = new Point(RX, panelTop + (int)(72 * uiScale)),
+            Size = new Size(RW, (int)(20 * uiScale)),
+            Font = extBoldFont,
+        };
+        Label lblKanaFew = MakeMsImeLabel("「少し無効」の時間", RX, kcRowFew + kcDy, kcLblW, (int)(20 * uiScale));
+        numSuspendFew = new NumericUpDown
+        {
+            Location = new Point(kcValueX, kcRowFew),
+            Size = new Size(kcNumW, (int)(24 * uiScale)),
+            Minimum = 1,     // SuspendFewTime / SuspendTime の範囲（1〜1440分）
+            Maximum = 1440,
+            Value = 5,
+        };
+        Label lblKanaFewUnit = MakeMsImeLabel("分", kcValueX + kcNumW + SP, kcRowFew + kcDy, (int)(30 * uiScale), (int)(20 * uiScale));
+        Label lblKanaLong = MakeMsImeLabel("「しばらく無効」の時間", RX, kcRowLong + kcDy, kcLblW, (int)(20 * uiScale));
+        numSuspendLong = new NumericUpDown
+        {
+            Location = new Point(kcValueX, kcRowLong),
+            Size = new Size(kcNumW, (int)(24 * uiScale)),
+            Minimum = 1,
+            Maximum = 1440,
+            Value = 45,
+        };
+        Label lblKanaLongUnit = MakeMsImeLabel("分", kcValueX + kcNumW + SP, kcRowLong + kcDy, (int)(30 * uiScale), (int)(20 * uiScale));
+
+        Label kanaHint = MakeMsImeLabel(
+            "・一時停止中にもう一度キーを押すと、すぐに再開します。\r\n" +
+            "・一時停止中は、トレイアイコンがオレンジ色になり、一時停止マークが表示されます。\r\n" +
+            "・このキー本来の動作（ひらがな入力に切り替え）は、そのまま使用できます。\r\n" +
+            "・管理者権限で動作しているウィンドウでは、キーを検出できない場合があります。\r\n" +
+            "　その場合は、AlwaysIMEも管理者として起動してください。 \r\n" +
+            "※ 変更は「保存して閉じる」または「適用」を押すと反映されます。",
+            RX, panelTop + (int)(164 * uiScale), RW, (int)(120 * uiScale));
+
+        kanaKeyControls = new Control[]
+        {
+            chkKanaKey, lblKanaKind, cmbKanaKind, kanaSeparator, hdrKanaTime,
+            lblKanaFew, numSuspendFew, lblKanaFewUnit,
+            lblKanaLong, numSuspendLong, lblKanaLongUnit,
+            kanaHint,
+        };
+        this.Controls.AddRange(kanaKeyControls);
+
         // ---- 自動起動パネル ----
         int hintX = RX + (int)(22 * uiScale);
         int hintW = RW - (int)(22 * uiScale);
@@ -782,7 +869,7 @@ public class ConfigForm : Form
                     text = "現在選択中のIMEでは利用できません。\r\nWindows 11の新しいMicrosoft IMEを選ぶと利用できます。";
                     break;
                 case ImeEnvironment.Status.CompatMode:
-                    text = "互換モード（旧IME）のMicrosoft IMEでは利用できません。\r\nIMEの設定で互換モードをオフにすると利用できます。";
+                    text = "互換モード（旧IME）のMicrosoft IMEでは、スペース・句読点の切替を利用できません。\r\n変換 / 無変換キーの割り当ては利用できます。";
                     break;
             }
         }
@@ -906,10 +993,20 @@ public class ConfigForm : Form
 
         // ---- MS-IME入力設定 ----
         // キー割り当て: 設定済みならその値、未設定ならレジストリの現在値
+        // （互換モード（旧IME）では、キー設定テーブルの現在の状態を見る）
         string keyAssignBuff = ConfigurationManager.AppSettings["KeyAssignment"];
-        chkKeyAssign.Checked = !string.IsNullOrEmpty(keyAssignBuff)
-            ? keyAssignBuff == "1"
-            : ResidentTest.ReadMsImeDword("IsKeyAssignmentEnabled") == 1;
+        if (!string.IsNullOrEmpty(keyAssignBuff))
+        {
+            chkKeyAssign.Checked = keyAssignBuff == "1";
+        }
+        else if (ImeEnvironment.GetStatus() == ImeEnvironment.Status.CompatMode)
+        {
+            chkKeyAssign.Checked = LegacyKeyAssignment.IsAssigned();
+        }
+        else
+        {
+            chkKeyAssign.Checked = ResidentTest.ReadMsImeDword("IsKeyAssignmentEnabled") == 1;
+        }
 
         // 切替の有効/無効: 明示設定があればその値、未設定なら従来の設定値の有無で判定
         string switchBuff = ConfigurationManager.AppSettings["MsImeSwitch"];
@@ -948,6 +1045,46 @@ public class ConfigForm : Form
         cmbSpaceTo.SelectedIndex = spaceTo;
         cmbPunctInit.SelectedIndex = punctInit;
         cmbPunctTo.SelectedIndex = punctTo;
+
+        // ---- 一時停止キー ----
+        LoadKanaKeySettings();
+    }
+
+    // ============================================================
+    // 一時停止キー（カタカナ・ひらがな・ローマ字キー）
+    // ============================================================
+
+    private void LoadKanaKeySettings()
+    {
+        // 0・未設定・不正な値のときは「使わない」。選択は「しばらく無効」から始める
+        string mode = ConfigurationManager.AppSettings["KanaKeySuspend"];
+        chkKanaKey.Checked = mode == "1" || mode == "2";
+        cmbKanaKind.SelectedIndex = mode == "1" ? 0 : 1;
+        LoadMinutes(numSuspendFew, "SuspendFewTime");
+        LoadMinutes(numSuspendLong, "SuspendTime");
+        UpdateKanaKeyControlsEnabled();
+    }
+
+    // 設定ファイルの分数を読み込む。読めないときはひな形の値、それも読めないときは下限にする
+    private static void LoadMinutes(NumericUpDown ctrl, string key)
+    {
+        int v;
+        if (!int.TryParse(ConfigurationManager.AppSettings[key], NumberStyles.Integer, CultureInfo.InvariantCulture, out v))
+        {
+            if (!(ConfigStore.Defaults.TryGetValue(key, out string d)
+                && int.TryParse(d, NumberStyles.Integer, CultureInfo.InvariantCulture, out v)))
+            {
+                v = (int)ctrl.Minimum;
+            }
+        }
+        ctrl.Value = Math.Max(ctrl.Minimum, Math.Min(ctrl.Maximum, v));
+    }
+
+    // キーでの一時停止を使わない設定のときは、使う時間の選択を操作できないようにする
+    // （「少し無効」「しばらく無効」の時間は、メニューでも使うため、常に変更できる）
+    private void UpdateKanaKeyControlsEnabled()
+    {
+        cmbKanaKind.Enabled = chkKanaKey.Checked;
     }
 
     // ============================================================
@@ -1507,6 +1644,10 @@ public class ConfigForm : Form
             c.Visible = isMsIme;
         RefreshImeNotice();
 
+        bool isKanaKey = cat.Type == "kanakey";
+        foreach (Control c in kanaKeyControls)
+            c.Visible = isKanaKey;
+
         foreach (Control c in extControls)
             c.Visible = cat.Type == "extended";
 
@@ -1656,6 +1797,11 @@ public class ConfigForm : Form
         SetAppSetting(config, "MsImeSwitch", chkMsImeSwitch.Checked ? "1" : "0");
         SetAppSetting(config, "SpaceWidth", $"{cmbSpaceInit.SelectedIndex},{cmbSpaceTo.SelectedIndex}");
         SetAppSetting(config, "Punctuation", $"{cmbPunctInit.SelectedIndex},{cmbPunctTo.SelectedIndex}");
+
+        // 一時停止キー（使わないときは 0。使うときは、停止する時間の種類。1: 少し無効 / 2: しばらく無効）
+        SetAppSetting(config, "KanaKeySuspend", !chkKanaKey.Checked ? "0" : (cmbKanaKind.SelectedIndex == 0 ? "1" : "2"));
+        SetAppSetting(config, "SuspendFewTime", ((int)numSuspendFew.Value).ToString(CultureInfo.InvariantCulture));
+        SetAppSetting(config, "SuspendTime", ((int)numSuspendLong.Value).ToString(CultureInfo.InvariantCulture));
 
         // 自動バックアップの設定
         if (cmbBackupHours.SelectedIndex >= 0)

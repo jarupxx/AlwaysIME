@@ -332,11 +332,13 @@ class ResidentTest : Form
     internal const int ImeOffArray = 1;
     internal const int ImeOffTitleArray = 2;
     internal const int RemoveUpdateTagArray = 3;
-    // 次の4つは既定値を持たない。起動時に InitializeAppConfig() が、検証済みの設定値で必ず設定する
+    // 次の5つは既定値を持たない。起動時に InitializeAppConfig() が、検証済みの設定値で必ず設定する
     // （既定値はひな形ファイルだけが持つ）
     private static int imeInterval;
     private static int SuspendFewInterval;
     private static int SuspendInterval;
+    // カタカナ・ひらがな・ローマ字キーでの一時停止。0: 使わない / 1: 「少し無効」の時間 / 2: 「しばらく無効」の時間
+    private static int KanaKeyMode;
     internal static int noKeyInputInterval;
     private DateTime lastInputTime;
     // 一時停止中は、その待機を取り消すためのフラグを持つ（null = 停止していない）。
@@ -474,12 +476,24 @@ class ResidentTest : Form
         this.lastInputTime = DateTime.Now;
     }
 
-    // フォームのハンドルができたら、カタカナ・ひらがなキーの監視を始める
-    // （キーが押されたときの処理を、BeginInvoke でUIスレッドへ渡すため）
+    // フォームのハンドルができたら、設定に合わせてカタカナ・ひらがなキーの監視を始める
+    // （キーが押されたときの処理を、BeginInvoke でUIスレッドへ渡すため、ハンドルが必要）
     protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        if (kanaKeyWatcher == null)
+        SyncKanaKeyWatcher();
+    }
+
+    // 設定（KanaKeySuspend）に合わせて、キーの監視を開始・停止する。
+    // 使わない設定のときは、キーボードフックそのものを入れない
+    private void SyncKanaKeyWatcher()
+    {
+        if (!IsHandleCreated)
+        {
+            return; // ハンドルができたときに、OnHandleCreated がもう一度呼ぶ
+        }
+        bool needed = KanaKeyMode != 0 && !exiting;
+        if (needed && kanaKeyWatcher == null)
         {
             kanaKeyWatcher = new KanaKeyWatcher(() =>
             {
@@ -496,6 +510,12 @@ class ResidentTest : Form
                 }
             });
             kanaKeyWatcher.Start();
+        }
+        else if (!needed && kanaKeyWatcher != null)
+        {
+            kanaKeyWatcher.Dispose();
+            kanaKeyWatcher = null;
+            AppLog.Info("カタカナ・ひらがなキーの監視を停止しました");
         }
     }
 
@@ -658,6 +678,8 @@ class ResidentTest : Form
             InitializeAppConfigCore();
             // ログの設定（出力の有無、レベル、サイズ）を反映する
             AppLog.ReloadSettings();
+            // カタカナ・ひらがなキーの監視を、設定に合わせて開始・停止する
+            currentInstance?.SyncKanaKeyWatcher();
         }
         catch (ConfigReloadRequestedException)
         {
@@ -708,6 +730,7 @@ class ResidentTest : Form
         imeInterval = ParseInt(GetSetting("intervalTime"));
         SuspendFewInterval = ParseInt(GetSetting("SuspendFewTime"));
         SuspendInterval = ParseInt(GetSetting("SuspendTime"));
+        KanaKeyMode = ParseInt(GetSetting("KanaKeySuspend"));
         noKeyInputInterval = (int)Math.Round(ParseDouble(GetSetting("NoKeyInputTime")) * 60 * 1000);
 
         // MS-IME入力設定(スペース/句読点切替)の有効/無効
@@ -1416,11 +1439,11 @@ class ResidentTest : Form
     }
 
     // カタカナ・ひらがな・ローマ字キーが押されたとき（UIスレッドで呼ぶ）。キー自体の動作（IMEの切り替え）は妨げない。
-    //  動作中: 「しばらく無効」と同じ時間だけ、自動制御を止める
-    //  停止中: 再開する（「少し無効」「しばらく無効」で止めた場合も同じ）
+    //  動作中: 設定（KanaKeySuspend）で選んだ「少し無効」または「しばらく無効」の時間だけ、自動制御を止める
+    //  停止中: 再開する（メニューの「少し無効」「しばらく無効」で止めた場合も同じ）
     private void OnKanaKeyPressed()
     {
-        if (exiting)
+        if (exiting || KanaKeyMode == 0)
         {
             return;
         }
@@ -1430,7 +1453,8 @@ class ResidentTest : Form
         }
         else
         {
-            _ = SuspendAsync(TimeSpan.FromMinutes(SuspendInterval), "カタカナ・ひらがなキー");
+            int minutes = KanaKeyMode == 1 ? SuspendFewInterval : SuspendInterval;
+            _ = SuspendAsync(TimeSpan.FromMinutes(minutes), "カタカナ・ひらがなキー");
         }
     }
 
