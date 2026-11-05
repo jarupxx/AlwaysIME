@@ -332,18 +332,25 @@ class ResidentTest : Form
     internal const int ImeOffArray = 1;
     internal const int ImeOffTitleArray = 2;
     internal const int RemoveUpdateTagArray = 3;
-    // 次の4つは既定値を持たない。起動時に InitializeAppConfig() が、検証済みの設定値で必ず設定する
+    // 次の5つは既定値を持たない。起動時に InitializeAppConfig() が、検証済みの設定値で必ず設定する
     // （既定値はひな形ファイルだけが持つ）
     private static int imeInterval;
     private static int SuspendFewInterval;
     private static int SuspendInterval;
+    // カタカナ・ひらがな・ローマ字キーでの一時停止。0: 使わない / 1: 「一時停止」の時間（SuspendFewTime） / 2: 「しばらく停止」の時間（SuspendTime）
+    private static int KanaKeyMode;
     internal static int noKeyInputInterval;
     private DateTime lastInputTime;
     // 一時停止中は、その待機を取り消すためのフラグを持つ（null = 停止していない）。
-    // 「少し無効」「しばらく無効」はすべてこの状態を共有する
+    // メニューの「一時停止」「しばらく停止」「再開」と「カタカナ・ひらがなキー」は、すべてこの状態を共有する
     private CancellationTokenSource suspendCts;
     private DateTime suspendUntil;
     private bool IsSuspended => suspendCts != null;
+    // トレイメニューの一時停止関連の項目（動作中は「一時停止」「しばらく停止」、停止中は「再開」だけを表示する）
+    private ToolStripMenuItem suspendFewMenuItem;
+    private ToolStripMenuItem suspendMenuItem;
+    private ToolStripMenuItem resumeMenuItem;
+    private KanaKeyWatcher kanaKeyWatcher;
     private readonly Dictionary<int, Icon> iconCache = new Dictionary<int, Icon>();
     IntPtr imwd;
     int imeConvMode = 0;
@@ -471,6 +478,49 @@ class ResidentTest : Form
         this.timer.Tick += new EventHandler(Timer_Tick);
         this.timer.Start();
         this.lastInputTime = DateTime.Now;
+    }
+
+    // フォームのハンドルができたら、設定に合わせてカタカナ・ひらがなキーの監視を始める
+    // （キーが押されたときの処理を、BeginInvoke でUIスレッドへ渡すため、ハンドルが必要）
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        SyncKanaKeyWatcher();
+    }
+
+    // 設定（KanaKeySuspend）に合わせて、キーの監視を開始・停止する。
+    // 使わない設定のときは、キーボードフックそのものを入れない
+    private void SyncKanaKeyWatcher()
+    {
+        if (!IsHandleCreated)
+        {
+            return; // ハンドルができたときに、OnHandleCreated がもう一度呼ぶ
+        }
+        bool needed = KanaKeyMode != 0 && !exiting;
+        if (needed && kanaKeyWatcher == null)
+        {
+            kanaKeyWatcher = new KanaKeyWatcher(() =>
+            {
+                try
+                {
+                    if (IsHandleCreated)
+                    {
+                        BeginInvoke(new Action(OnKanaKeyPressed));
+                    }
+                }
+                catch (InvalidOperationException)
+                {
+                    // 終了処理中（ObjectDisposedException も、これに含まれる）
+                }
+            });
+            kanaKeyWatcher.Start();
+        }
+        else if (!needed && kanaKeyWatcher != null)
+        {
+            kanaKeyWatcher.Dispose();
+            kanaKeyWatcher = null;
+            AppLog.Info("カタカナ・ひらがなキーの監視を停止しました");
+        }
     }
 
     // 設定値が不正な場合に確認ダイアログを表示する。
@@ -632,6 +682,10 @@ class ResidentTest : Form
             InitializeAppConfigCore();
             // ログの設定（出力の有無、レベル、サイズ）を反映する
             AppLog.ReloadSettings();
+            // カタカナ・ひらがなキーの監視を、設定に合わせて開始・停止する
+            currentInstance?.SyncKanaKeyWatcher();
+            // トレイメニューの「一時停止（N分）」「しばらく停止（N分）」の分数を、設定に合わせる
+            currentInstance?.UpdateSuspendMenu();
         }
         catch (ConfigReloadRequestedException)
         {
@@ -682,6 +736,7 @@ class ResidentTest : Form
         imeInterval = ParseInt(GetSetting("intervalTime"));
         SuspendFewInterval = ParseInt(GetSetting("SuspendFewTime"));
         SuspendInterval = ParseInt(GetSetting("SuspendTime"));
+        KanaKeyMode = ParseInt(GetSetting("KanaKeySuspend"));
         noKeyInputInterval = (int)Math.Round(ParseDouble(GetSetting("NoKeyInputTime")) * 60 * 1000);
 
         // MS-IME入力設定(スペース/句読点切替)の有効/無効
@@ -926,6 +981,7 @@ class ResidentTest : Form
             Space_Click(this, EventArgs.Empty);
         }
         RestoreKeyAssignment();
+        kanaKeyWatcher?.Dispose();
         icon.Visible = false;
         icon.Dispose();
         DisposeIconCache();
@@ -979,17 +1035,15 @@ class ResidentTest : Form
         UpdateIconText();
         ContextMenuStrip menu = new ContextMenuStrip();
 
-        ToolStripMenuItem suspendFewMenuItem = new ToolStripMenuItem();
-        suspendFewMenuItem.Text = "少し無効(&D)";
+        suspendFewMenuItem = new ToolStripMenuItem();
         suspendFewMenuItem.Click += new EventHandler(SuspendFewMenuItem_Click);
 
-        ToolStripMenuItem suspendMenuItem = new ToolStripMenuItem();
-        suspendMenuItem.Text = "しばらく無効(&W)";
+        suspendMenuItem = new ToolStripMenuItem();
         suspendMenuItem.Click += new EventHandler(SuspendMenuItem_Click);
 
-        ToolStripMenuItem resumeMenuItem = new ToolStripMenuItem();
-        resumeMenuItem.Text = "再度有効(&R)";
+        resumeMenuItem = new ToolStripMenuItem();
         resumeMenuItem.Click += new EventHandler(ResumeMenuItem_Click);
+        UpdateSuspendMenu();
 
         ToolStripSeparator separator1 = new ToolStripSeparator();
 
@@ -1388,6 +1442,26 @@ class ResidentTest : Form
         await SuspendAsync(TimeSpan.FromMinutes(SuspendInterval), "クリック");
     }
 
+    // カタカナ・ひらがな・ローマ字キーが押されたとき（UIスレッドで呼ぶ）。キー自体の動作（IMEの切り替え）は妨げない。
+    //  動作中: 設定（KanaKeySuspend）で選んだ「一時停止」または「しばらく停止」の時間だけ、自動制御を止める
+    //  停止中: 再開する（メニューの「一時停止」「しばらく停止」で止めた場合も同じ）
+    private void OnKanaKeyPressed()
+    {
+        if (exiting || KanaKeyMode == 0)
+        {
+            return;
+        }
+        if (IsSuspended)
+        {
+            Resume("カタカナ・ひらがなキー");
+        }
+        else
+        {
+            int minutes = KanaKeyMode == 1 ? SuspendFewInterval : SuspendInterval;
+            _ = SuspendAsync(TimeSpan.FromMinutes(minutes), "カタカナ・ひらがなキー");
+        }
+    }
+
     // 自動制御を止め、指定の時間が過ぎたら自動で再開する。
     // すでに止めている間に呼ばれたときは、前の待機を取り消して、時間を数え直す。
     private async Task SuspendAsync(TimeSpan duration, string trigger)
@@ -1402,7 +1476,8 @@ class ResidentTest : Form
         this.timer.Stop();
         SetIcon(ICON_ORANGE);
         UpdateIconText();
-        AppLog.Info($"{trigger}により、{duration.TotalMinutes}分間無効にします({suspendUntil}まで)");
+        UpdateSuspendMenu();
+        AppLog.Info($"{trigger}により、{duration.TotalMinutes}分間一時停止します({suspendUntil}まで)");
 
         try
         {
@@ -1424,6 +1499,7 @@ class ResidentTest : Form
         this.timer.Start();
         SetIcon(ICON_GREEN);
         UpdateIconText();
+        UpdateSuspendMenu();
         AppLog.Info("時間が経過したため、再開しました");
     }
 
@@ -1441,7 +1517,27 @@ class ResidentTest : Form
         this.timer.Start();
         SetIcon(ICON_GREEN);
         UpdateIconText();
+        UpdateSuspendMenu();
         AppLog.Info($"{trigger}により再開しました");
+    }
+
+    // トレイメニューの一時停止関連の項目を、現在の状態と設定値に合わせる（UIスレッドで呼ぶ）。
+    //  動作中: 「一時停止（N分）」「しばらく停止（N分）」を表示し、「再開」は隠す
+    //  停止中: 「再開」だけを表示する
+    // N は SuspendFewTime / SuspendTime の値。設定を反映し直したときにも呼ぶ（メニューの作成前は何もしない）
+    private void UpdateSuspendMenu()
+    {
+        if (suspendFewMenuItem == null || suspendMenuItem == null || resumeMenuItem == null)
+        {
+            return;
+        }
+        suspendFewMenuItem.Text = $"一時停止（{SuspendFewInterval}分）(&D)";
+        suspendMenuItem.Text = $"しばらく停止（{SuspendInterval}分）(&W)";
+        resumeMenuItem.Text = "再開(&R)";
+        bool suspended = IsSuspended;
+        suspendFewMenuItem.Visible = !suspended;
+        suspendMenuItem.Visible = !suspended;
+        resumeMenuItem.Visible = suspended;
     }
 
     // トレイアイコンにカーソルを合わせたときの表示。一時停止中は、再開する時刻も示す
