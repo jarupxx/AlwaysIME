@@ -224,7 +224,7 @@ public class ConfigForm : Form
         { "Punctuation", "MS-IMEの句読点を「初期値,切替先」の形式で指定します。\n0: ，．  1: 、。  2: 、．  3: ，。\n例: 1,3\n※ MsImeSwitch が 1 のときに有効です。" },
         { "SpaceWidth", "MS-IMEのスペース入力を「初期値,切替先」の形式で指定します。\n0: 現在の入力モード  1: 常に全角  2: 常に半角\n例: 1,2\n※ MsImeSwitch が 1 のときに有効です。" },
         { "MsImeSwitch", "スペース / 句読点の切替を有効にするかどうかです。\n1: 有効（トレイメニューから切替できます）\n0: 無効（レジストリへの書き込みを行いません）" },
-        { "KeyAssignment", "変換キー→IME-ON / 「無変換キー」→IME-OFF の割り当てです。\n1: 割り当てる  0: 割り当てない\n空欄: 管理しない（終了時には変更前の設定に戻します）" },
+        { "KeyAssignment", "「変換キー」→IME-ON / 「無変換キー」→IME-OFF の割り当てです。\n1: 割り当てる  0: 割り当てない\n空欄: 管理しない（終了時には変更前の設定に戻します）" },
         { "AppExitEnd", "トレイメニューの「常駐の終了」の位置です。\n1: メニューの末尾に配置  0: 上部に配置\n※ 反映は再起動後です。" },
         { "BackupStableHours", "設定を変更してから、アプリがこの時間（単位: 時間）動作し続けたら、安定動作を確認できたとみなして「安定版バックアップ」を作成します。\n設定を試行錯誤している間は作成されません。\n0 を指定すると、確認のたびに作成します。" },
         { "BackupKeep", "保持する安定版バックアップの世代数です（1〜50）。\n超えた分は古いものから削除します。\n保存先: 設定ファイルと同じ場所の backup フォルダー" },
@@ -374,7 +374,7 @@ public class ConfigForm : Form
         // ---- MS-IME入力設定パネル ----
         chkKeyAssign = new CheckBox
         {
-            Text = "変換キー→IME-ON / 「無変換キー」→IME-OFFに割り当てる",
+            Text = "「変換キー」→IME-ON / 「無変換キー」→IME-OFFに割り当てる",
             Location = new Point(RX, panelTop),
             Size = new Size(RW, (int)(24 * uiScale)),
         };

@@ -865,7 +865,7 @@ class ResidentTest : Form
         }
     }
 
-    // 変換キー→IME-ON / 「無変換キー」→IME-OFF の割り当てを有効化・無効化する
+    // 「変換キー」→IME-ON / 「無変換キー」→IME-OFF の割り当てを有効化・無効化する
     private static void ApplyKeyAssignment(bool enable)
     {
         if (ImeEnvironment.GetStatus() == ImeEnvironment.Status.CompatMode)
@@ -882,7 +882,7 @@ class ResidentTest : Form
         if (enable)
         {
             ok = WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "IsKeyAssignmentEnabled", 1, RegistryValueKind.DWord);
-            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentHenkan", 0, RegistryValueKind.DWord);   // 変換キー → IME-ON
+            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentHenkan", 0, RegistryValueKind.DWord);   // 「変換キー」 → IME-ON
             ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentMuhenkan", 1, RegistryValueKind.DWord); // 「無変換キー」 → IME-OFF
         }
         else
