@@ -337,7 +337,7 @@ class ResidentTest : Form
     private static int imeInterval;
     private static int SuspendFewInterval;
     private static int SuspendInterval;
-    // カタカナ・ひらがな・ローマ字キーでの一時停止。0: 使わない / 1: 「一時停止」の時間（SuspendFewTime） / 2: 「しばらく停止」の時間（SuspendTime）
+    // 「カタカナ・ひらがな・ローマ字キー」での一時停止。0: 使わない / 1: 「一時停止」の時間（SuspendFewTime） / 2: 「しばらく停止」の時間（SuspendTime）
     private static int KanaKeyMode;
     internal static int noKeyInputInterval;
     private DateTime lastInputTime;
@@ -1442,7 +1442,7 @@ class ResidentTest : Form
         await SuspendAsync(TimeSpan.FromMinutes(SuspendInterval), "クリック");
     }
 
-    // カタカナ・ひらがな・ローマ字キーが押されたとき（UIスレッドで呼ぶ）。キー自体の動作（IMEの切り替え）は妨げない。
+    // 「カタカナ・ひらがな・ローマ字キー」が押されたとき（UIスレッドで呼ぶ）。キー自体の動作（IMEの切り替え）は妨げない。
     //  動作中: 設定（KanaKeySuspend）で選んだ「一時停止」または「しばらく停止」の時間だけ、自動制御を止める
     //  停止中: 再開する（メニューの「一時停止」「しばらく停止」で止めた場合も同じ）
     private void OnKanaKeyPressed()

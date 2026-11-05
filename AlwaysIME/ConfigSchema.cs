@@ -46,7 +46,7 @@ static class ConfigSchema
         ("NoKeyInputTime", Float(0.1, 1440)),                           // 分。(int)(分*60*1000)が桁あふれしない範囲
         ("SuspendFewTime", Int(1, 1440)),                               // 分
         ("SuspendTime", Int(1, 1440)),                                  // 分
-        ("KanaKeySuspend", OneOf(false, "0", "1", "2")),                // カタカナ・ひらがな・ローマ字キーでの一時停止。0: 使わない / 1: 「少し無効」の時間 / 2: 「しばらく無効」の時間
+        ("KanaKeySuspend", OneOf(false, "0", "1", "2")),                // 「カタカナ・ひらがな・ローマ字キー」での一時停止。0: 使わない / 1: 「少し無効」の時間 / 2: 「しばらく無効」の時間
         ("MsImeSwitch", OneOf(false, "0", "1")),
         ("Punctuation", IntPair(3)),                                    // 空欄 = 切り替えない
         ("SpaceWidth", IntPair(2)),                                     // 空欄 = 切り替えない

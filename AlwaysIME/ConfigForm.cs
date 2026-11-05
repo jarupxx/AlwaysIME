@@ -76,7 +76,7 @@ public class ConfigForm : Form
         {
             AppSettingKey = "KanaKeySuspend",
             Label = "一時停止キー",
-            Desc = "カタカナ・ひらがな・ローマ字キーを押すと、IMEの自動制御を一時停止します。\r\nもう一度押すか、設定した時間が過ぎると再開します。\r\nトレイメニューの「一時停止」「しばらく停止」と同じ停止状態です。",
+            Desc = "「カタカナ・ひらがな・ローマ字キー」を押すと、IMEの自動制御を一時停止します。\r\nもう一度押すか、設定した時間が過ぎると再開します。\r\nトレイメニューの「一時停止」「しばらく停止」と同じ停止状態です。",
             Type = "kanakey",
         },
         new ConfigCategory
@@ -175,7 +175,7 @@ public class ConfigForm : Form
     private Control[] msimeControls;
     private Label lblImeNotice;   // 対応していないIMEを使っているときの警告（MS-IME入力設定の下部）
 
-    // 一時停止キーのパネル（カタカナ・ひらがな・ローマ字キー）
+    // 一時停止キーのパネル（「カタカナ・ひらがな・ローマ字キー」）
     private static readonly string[] KanaKeyKindLabels = ["「一時停止」の時間", "「しばらく停止」の時間"];
     private CheckBox chkKanaKey;
     private ComboBox cmbKanaKind;
@@ -217,9 +217,9 @@ public class ConfigForm : Form
         { "ImeOffTitle", "ウィンドウタイトルにマッチしたらIMEをオフにする正規表現です。\nカンマ区切りで複数指定でき、全アプリ共通で適用されます。\n例: \\.cs$" },
         { "UpdateTag", "ウィンドウタイトルの変化を判定するときに無視する部分の正規表現です。\nマッチした部分を除去してから変化を判定します。カンマ区切りで複数指定できます。\n例: \\(更新\\)" },
         { "intervalTime", "IMEの状態を監視する間隔です（ミリ秒）。\n小さいほど反応が早くなりますが、負荷が増えます。\n例: 200" },
-        { "SuspendFewTime", "トレイメニュー「一時停止」で、機能を停止する時間です（分）。\nKanaKeySuspend が 1 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
-        { "SuspendTime", "トレイメニュー「しばらく停止」で、機能を停止する時間です（分）。\nKanaKeySuspend が 2 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
-        { "KanaKeySuspend", "カタカナ・ひらがな・ローマ字キーを押したときに、機能を一時停止するかどうかです。停止中にもう一度押すと再開します。\n0: 使わない\n1: 「一時停止」の時間（SuspendFewTime）だけ停止\n2: 「しばらく停止」の時間（SuspendTime）だけ停止\n※ キー自体の動作（IMEの切り替え）は妨げません。" },
+        { "SuspendFewTime", "トレイメニュー「一時停止」で、機能を停止する時間です（分）。\nKanaKeySuspend が 1 のときは、一時停止キー（「カタカナ・ひらがな・ローマ字キー」）でも、この時間だけ停止します。" },
+        { "SuspendTime", "トレイメニュー「しばらく停止」で、機能を停止する時間です（分）。\nKanaKeySuspend が 2 のときは、一時停止キー（「カタカナ・ひらがな・ローマ字キー」）でも、この時間だけ停止します。" },
+        { "KanaKeySuspend", "「カタカナ・ひらがな・ローマ字キー」を押したときに、機能を一時停止するかどうかです。停止中にもう一度押すと再開します。\n0: 使わない\n1: 「一時停止」の時間（SuspendFewTime）だけ停止\n2: 「しばらく停止」の時間（SuspendTime）だけ停止\n※ キー自体の動作（IMEの切り替え）は妨げません。" },
         { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
         { "Punctuation", "MS-IMEの句読点を「初期値,切替先」の形式で指定します。\n0: ，．  1: 、。  2: 、．  3: ，。\n例: 1,3\n※ MsImeSwitch が 1 のときに有効です。" },
         { "SpaceWidth", "MS-IMEのスペース入力を「初期値,切替先」の形式で指定します。\n0: 現在の入力モード  1: 常に全角  2: 常に半角\n例: 1,2\n※ MsImeSwitch が 1 のときに有効です。" },
@@ -669,7 +669,7 @@ public class ConfigForm : Form
 
         chkKanaKey = new CheckBox
         {
-            Text = "カタカナ・ひらがな・ローマ字キーで一時停止 / 再開する",
+            Text = "「カタカナ・ひらがな・ローマ字キー」で一時停止 / 再開する",
             Location = new Point(RX, panelTop),
             Size = new Size(RW, (int)(24 * uiScale)),
         };
@@ -1051,7 +1051,7 @@ public class ConfigForm : Form
     }
 
     // ============================================================
-    // 一時停止キー（カタカナ・ひらがな・ローマ字キー）
+    // 一時停止キー（「カタカナ・ひらがな・ローマ字キー」）
     // ============================================================
 
     private void LoadKanaKeySettings()
