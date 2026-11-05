@@ -5,7 +5,7 @@
 #   InstallerSha256 そのファイルのSHA256（installer\build.ps1 の最後にも表示される）
 
 PackageIdentifier: jarupxx.AlwaysIME
-PackageVersion: 0.6.9-alpha.2
+PackageVersion: 0.6.9-alpha.3
 InstallerType: inno
 Scope: user
 InstallModes:
