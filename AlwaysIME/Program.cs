@@ -337,7 +337,7 @@ class ResidentTest : Form
     private static int imeInterval;
     private static int SuspendFewInterval;
     private static int SuspendInterval;
-    // カタカナ・ひらがな・ローマ字キーでの一時停止。0: 使わない / 1: 「一時停止」の時間（SuspendFewTime） / 2: 「しばらく停止」の時間（SuspendTime）
+    // 「カタカナ・ひらがな・ローマ字キー」での一時停止。0: 使わない / 1: 「一時停止」の時間（SuspendFewTime） / 2: 「しばらく停止」の時間（SuspendTime）
     private static int KanaKeyMode;
     internal static int noKeyInputInterval;
     private DateTime lastInputTime;
@@ -437,7 +437,7 @@ class ResidentTest : Form
     static int SetSpaceMode;
     // MS-IME入力設定(レジストリ)
     const string MsImeRegistryPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
-    // 変換/無変換キーへのIMEオン・オフ割り当て: 変更前の値を保持して終了時に復元する
+    // 「変換キー」/「無変換キー」へのIMEオン・オフ割り当て: 変更前の値を保持して終了時に復元する
     static bool keyAssignmentRecorded = false;
     static int origKeyAssignment = -1; // -1 = 元々値が存在しなかった
     static readonly string[] keyPath = new string[2];
@@ -865,7 +865,7 @@ class ResidentTest : Form
         }
     }
 
-    // 変換キー→IME-ON / 無変換キー→IME-OFF の割り当てを有効化・無効化する
+    // 「変換キー」→IME-ON / 「無変換キー」→IME-OFF の割り当てを有効化・無効化する
     private static void ApplyKeyAssignment(bool enable)
     {
         if (ImeEnvironment.GetStatus() == ImeEnvironment.Status.CompatMode)
@@ -882,8 +882,8 @@ class ResidentTest : Form
         if (enable)
         {
             ok = WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "IsKeyAssignmentEnabled", 1, RegistryValueKind.DWord);
-            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentHenkan", 0, RegistryValueKind.DWord);   // 変換キー → IME-ON
-            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentMuhenkan", 1, RegistryValueKind.DWord); // 無変換キー → IME-OFF
+            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentHenkan", 0, RegistryValueKind.DWord);   // 「変換キー」 → IME-ON
+            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentMuhenkan", 1, RegistryValueKind.DWord); // 「無変換キー」 → IME-OFF
         }
         else
         {
@@ -1442,7 +1442,7 @@ class ResidentTest : Form
         await SuspendAsync(TimeSpan.FromMinutes(SuspendInterval), "クリック");
     }
 
-    // カタカナ・ひらがな・ローマ字キーが押されたとき（UIスレッドで呼ぶ）。キー自体の動作（IMEの切り替え）は妨げない。
+    // 「カタカナ・ひらがな・ローマ字キー」が押されたとき（UIスレッドで呼ぶ）。キー自体の動作（IMEの切り替え）は妨げない。
     //  動作中: 設定（KanaKeySuspend）で選んだ「一時停止」または「しばらく停止」の時間だけ、自動制御を止める
     //  停止中: 再開する（メニューの「一時停止」「しばらく停止」で止めた場合も同じ）
     private void OnKanaKeyPressed()

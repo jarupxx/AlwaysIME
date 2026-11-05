@@ -1,7 +1,7 @@
 using Microsoft.Win32;
 using System.Text;
 
-// 互換モード（旧IME）のMicrosoft IMEで、変換キー→IME-ON / 無変換キー→IME-OFF を割り当てる。
+// 互換モード（旧IME）のMicrosoft IMEで、「変換キー」→IME-ON / 「無変換キー」→IME-OFF を割り当てる。
 //
 // 新しいMS-IME（標準モード）は MSIME キーのDWORD 3つ（IsKeyAssignmentEnabled など）で割り当てるが、
 // 旧IMEは「キー設定テーブル」を持っていて、割り当てはそのテーブルの書き換えになる。
@@ -36,8 +36,8 @@ static class LegacyKeyAssignment
 
     private const string CodeImeOn = "CE";   // IME-オン
     private const string CodeImeOff = "CF";  // IME-オフ
-    private const string CodeReconvert = "87"; // 再変換（変換キーの初期値）
-    private const string CodeKanaSwitch = "97"; // かな切替（無変換キーの初期値）
+    private const string CodeReconvert = "87"; // 再変換（「変換キー」の初期値）
+    private const string CodeKanaSwitch = "97"; // かな切替（「無変換キー」の初期値）
     private const string CodeNone = "80";       // 割り当てなし（画面の「解除」で入る値）
 
     // 画面での変更のたびに MSIME\SerialNo が「起動からのミリ秒」で更新されていた（IME側が変更検知に使っている可能性）。
@@ -79,7 +79,7 @@ static class LegacyKeyAssignment
     // 変更前の状態に戻す。利用者が実行中に設定を変えていた場合は戻さない
     public static void Restore() => Restore(force: false);
 
-    // 現在、変換→IME-ON / 無変換→IME-OFF になっているか（設定画面の初期表示用）
+    // 現在、「変換キー」→IME-ON / 「無変換キー」→IME-OFF になっているか（設定画面の初期表示用）
     public static bool IsAssigned()
     {
         try
@@ -175,7 +175,7 @@ static class LegacyKeyAssignment
                 session.WrittenKeyStyle = CustomStyle;
                 BumpSerialNo(msime);
             }
-            AppLog.Info("旧IMEのキー割り当て（変換→IME-ON / 無変換→IME-OFF）を有効にしました");
+            AppLog.Info("旧IMEのキー割り当て（「変換キー」→IME-ON / 「無変換キー」→IME-OFF）を有効にしました");
             return true;
         }
     }
@@ -205,7 +205,7 @@ static class LegacyKeyAssignment
             }
             else
             {
-                // 変換→再変換 / 無変換→かな切替 に戻す。IME-ON/OFF（または割り当てなし）のときだけ書き換え、
+                // 「変換キー」→再変換 / 「無変換キー」→かな切替 に戻す。IME-ON/OFF（または割り当てなし）のときだけ書き換え、
                 // 他の機能を割り当てている場合は触らない。S4key の変換は、項目が無ければ作る
                 ok = ReplaceFirstCode(key, Henkan, CodeImeOn, CodeReconvert, addIfMissing: false, out keyChanged1)
                   && ReplaceFirstCode(key, Muhenkan, CodeImeOff, CodeKanaSwitch, addIfMissing: false, out keyChanged2)
