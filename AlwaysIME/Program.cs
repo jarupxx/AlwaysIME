@@ -437,7 +437,7 @@ class ResidentTest : Form
     static int SetSpaceMode;
     // MS-IME入力設定(レジストリ)
     const string MsImeRegistryPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
-    // 変換/「無変換キー」へのIMEオン・オフ割り当て: 変更前の値を保持して終了時に復元する
+    // 「変換キー」/「無変換キー」へのIMEオン・オフ割り当て: 変更前の値を保持して終了時に復元する
     static bool keyAssignmentRecorded = false;
     static int origKeyAssignment = -1; // -1 = 元々値が存在しなかった
     static readonly string[] keyPath = new string[2];

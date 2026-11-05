@@ -79,7 +79,7 @@ static class LegacyKeyAssignment
     // 変更前の状態に戻す。利用者が実行中に設定を変えていた場合は戻さない
     public static void Restore() => Restore(force: false);
 
-    // 現在、変換→IME-ON / 無変換→IME-OFF になっているか（設定画面の初期表示用）
+    // 現在、「変換キー」→IME-ON / 「無変換キー」→IME-OFF になっているか（設定画面の初期表示用）
     public static bool IsAssigned()
     {
         try
@@ -175,7 +175,7 @@ static class LegacyKeyAssignment
                 session.WrittenKeyStyle = CustomStyle;
                 BumpSerialNo(msime);
             }
-            AppLog.Info("旧IMEのキー割り当て（変換→IME-ON / 無変換→IME-OFF）を有効にしました");
+            AppLog.Info("旧IMEのキー割り当て（「変換キー」→IME-ON / 「無変換キー」→IME-OFF）を有効にしました");
             return true;
         }
     }
@@ -205,7 +205,7 @@ static class LegacyKeyAssignment
             }
             else
             {
-                // 変換→再変換 / 無変換→かな切替 に戻す。IME-ON/OFF（または割り当てなし）のときだけ書き換え、
+                // 「変換キー」→再変換 / 「無変換キー」→かな切替 に戻す。IME-ON/OFF（または割り当てなし）のときだけ書き換え、
                 // 他の機能を割り当てている場合は触らない。S4key の変換は、項目が無ければ作る
                 ok = ReplaceFirstCode(key, Henkan, CodeImeOn, CodeReconvert, addIfMissing: false, out keyChanged1)
                   && ReplaceFirstCode(key, Muhenkan, CodeImeOff, CodeKanaSwitch, addIfMissing: false, out keyChanged2)

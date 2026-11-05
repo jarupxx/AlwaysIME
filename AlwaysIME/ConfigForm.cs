@@ -869,7 +869,7 @@ public class ConfigForm : Form
                     text = "現在選択中のIMEでは利用できません。\r\nWindows 11の新しいMicrosoft IMEを選ぶと利用できます。";
                     break;
                 case ImeEnvironment.Status.CompatMode:
-                    text = "互換モード（旧IME）のMicrosoft IMEでは、スペース・句読点の切替を利用できません。\r\n変換 / 「無変換キー」の割り当ては利用できます。";
+                    text = "互換モード（旧IME）のMicrosoft IMEでは、スペース・句読点の切替を利用できません。\r\n「変換キー」/「無変換キー」の割り当ては利用できます。";
                     break;
             }
         }
