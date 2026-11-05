@@ -76,7 +76,7 @@ public class ConfigForm : Form
         {
             AppSettingKey = "KanaKeySuspend",
             Label = "一時停止キー",
-            Desc = "カタカナ・ひらがな・ローマ字キーを押すと、IMEの自動制御を一時停止します。\r\nもう一度押すか、設定した時間が過ぎると再開します。\r\nトレイメニューの「少し無効」「しばらく無効」と同じ停止状態です。",
+            Desc = "カタカナ・ひらがな・ローマ字キーを押すと、IMEの自動制御を一時停止します。\r\nもう一度押すか、設定した時間が過ぎると再開します。\r\nトレイメニューの「一時停止」「しばらく停止」と同じ停止状態です。",
             Type = "kanakey",
         },
         new ConfigCategory
@@ -176,7 +176,7 @@ public class ConfigForm : Form
     private Label lblImeNotice;   // 対応していないIMEを使っているときの警告（MS-IME入力設定の下部）
 
     // 一時停止キーのパネル（カタカナ・ひらがな・ローマ字キー）
-    private static readonly string[] KanaKeyKindLabels = ["「少し無効」の時間", "「しばらく無効」の時間"];
+    private static readonly string[] KanaKeyKindLabels = ["「一時停止」の時間", "「しばらく停止」の時間"];
     private CheckBox chkKanaKey;
     private ComboBox cmbKanaKind;
     private NumericUpDown numSuspendFew, numSuspendLong;
@@ -217,9 +217,9 @@ public class ConfigForm : Form
         { "ImeOffTitle", "ウィンドウタイトルにマッチしたらIMEをオフにする正規表現です。\nカンマ区切りで複数指定でき、全アプリ共通で適用されます。\n例: \\.cs$" },
         { "UpdateTag", "ウィンドウタイトルの変化を判定するときに無視する部分の正規表現です。\nマッチした部分を除去してから変化を判定します。カンマ区切りで複数指定できます。\n例: \\(更新\\)" },
         { "intervalTime", "IMEの状態を監視する間隔です（ミリ秒）。\n小さいほど反応が早くなりますが、負荷が増えます。\n例: 200" },
-        { "SuspendFewTime", "トレイメニュー「少し無効」で、機能を停止する時間です（分）。\nKanaKeySuspend が 1 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
-        { "SuspendTime", "トレイメニュー「しばらく無効」で、機能を停止する時間です（分）。\nKanaKeySuspend が 2 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
-        { "KanaKeySuspend", "カタカナ・ひらがな・ローマ字キーを押したときに、機能を一時停止するかどうかです。停止中にもう一度押すと再開します。\n0: 使わない\n1: 「少し無効」の時間（SuspendFewTime）だけ停止\n2: 「しばらく無効」の時間（SuspendTime）だけ停止\n※ キー自体の動作（IMEの切り替え）は妨げません。" },
+        { "SuspendFewTime", "トレイメニュー「一時停止」で、機能を停止する時間です（分）。\nKanaKeySuspend が 1 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
+        { "SuspendTime", "トレイメニュー「しばらく停止」で、機能を停止する時間です（分）。\nKanaKeySuspend が 2 のときは、一時停止キー（カタカナ・ひらがな・ローマ字キー）でも、この時間だけ停止します。" },
+        { "KanaKeySuspend", "カタカナ・ひらがな・ローマ字キーを押したときに、機能を一時停止するかどうかです。停止中にもう一度押すと再開します。\n0: 使わない\n1: 「一時停止」の時間（SuspendFewTime）だけ停止\n2: 「しばらく停止」の時間（SuspendTime）だけ停止\n※ キー自体の動作（IMEの切り替え）は妨げません。" },
         { "NoKeyInputTime", "この時間、キーボードやマウスの入力が無かったら、IMEの制御状態を復元します。\n単位は分です。" },
         { "Punctuation", "MS-IMEの句読点を「初期値,切替先」の形式で指定します。\n0: ，．  1: 、。  2: 、．  3: ，。\n例: 1,3\n※ MsImeSwitch が 1 のときに有効です。" },
         { "SpaceWidth", "MS-IMEのスペース入力を「初期値,切替先」の形式で指定します。\n0: 現在の入力モード  1: 常に全角  2: 常に半角\n例: 1,2\n※ MsImeSwitch が 1 のときに有効です。" },
@@ -690,7 +690,7 @@ public class ConfigForm : Form
             Size = new Size(RW, (int)(20 * uiScale)),
             Font = extBoldFont,
         };
-        Label lblKanaFew = MakeMsImeLabel("「少し無効」の時間", RX, kcRowFew + kcDy, kcLblW, (int)(20 * uiScale));
+        Label lblKanaFew = MakeMsImeLabel("「一時停止」の時間", RX, kcRowFew + kcDy, kcLblW, (int)(20 * uiScale));
         numSuspendFew = new NumericUpDown
         {
             Location = new Point(kcValueX, kcRowFew),
@@ -700,7 +700,7 @@ public class ConfigForm : Form
             Value = 5,
         };
         Label lblKanaFewUnit = MakeMsImeLabel("分", kcValueX + kcNumW + SP, kcRowFew + kcDy, (int)(30 * uiScale), (int)(20 * uiScale));
-        Label lblKanaLong = MakeMsImeLabel("「しばらく無効」の時間", RX, kcRowLong + kcDy, kcLblW, (int)(20 * uiScale));
+        Label lblKanaLong = MakeMsImeLabel("「しばらく停止」の時間", RX, kcRowLong + kcDy, kcLblW, (int)(20 * uiScale));
         numSuspendLong = new NumericUpDown
         {
             Location = new Point(kcValueX, kcRowLong),
@@ -1056,7 +1056,7 @@ public class ConfigForm : Form
 
     private void LoadKanaKeySettings()
     {
-        // 0・未設定・不正な値のときは「使わない」。選択は「しばらく無効」から始める
+        // 0・未設定・不正な値のときは「使わない」。選択は「しばらく停止」から始める
         string mode = ConfigurationManager.AppSettings["KanaKeySuspend"];
         chkKanaKey.Checked = mode == "1" || mode == "2";
         cmbKanaKind.SelectedIndex = mode == "1" ? 0 : 1;
@@ -1081,7 +1081,7 @@ public class ConfigForm : Form
     }
 
     // キーでの一時停止を使わない設定のときは、使う時間の選択を操作できないようにする
-    // （「少し無効」「しばらく無効」の時間は、メニューでも使うため、常に変更できる）
+    // （「一時停止」「しばらく停止」の時間は、メニューでも使うため、常に変更できる）
     private void UpdateKanaKeyControlsEnabled()
     {
         cmbKanaKind.Enabled = chkKanaKey.Checked;
@@ -1798,7 +1798,7 @@ public class ConfigForm : Form
         SetAppSetting(config, "SpaceWidth", $"{cmbSpaceInit.SelectedIndex},{cmbSpaceTo.SelectedIndex}");
         SetAppSetting(config, "Punctuation", $"{cmbPunctInit.SelectedIndex},{cmbPunctTo.SelectedIndex}");
 
-        // 一時停止キー（使わないときは 0。使うときは、停止する時間の種類。1: 少し無効 / 2: しばらく無効）
+        // 一時停止キー（使わないときは 0。使うときは、停止する時間の種類。1: 一時停止 / 2: しばらく停止）
         SetAppSetting(config, "KanaKeySuspend", !chkKanaKey.Checked ? "0" : (cmbKanaKind.SelectedIndex == 0 ? "1" : "2"));
         SetAppSetting(config, "SuspendFewTime", ((int)numSuspendFew.Value).ToString(CultureInfo.InvariantCulture));
         SetAppSetting(config, "SuspendTime", ((int)numSuspendLong.Value).ToString(CultureInfo.InvariantCulture));
