@@ -1,7 +1,7 @@
 using Microsoft.Win32;
 using System.Text;
 
-// 互換モード（旧IME）のMicrosoft IMEで、変換キー→IME-ON / 無変換キー→IME-OFF を割り当てる。
+// 互換モード（旧IME）のMicrosoft IMEで、変換キー→IME-ON / 「無変換キー」→IME-OFF を割り当てる。
 //
 // 新しいMS-IME（標準モード）は MSIME キーのDWORD 3つ（IsKeyAssignmentEnabled など）で割り当てるが、
 // 旧IMEは「キー設定テーブル」を持っていて、割り当てはそのテーブルの書き換えになる。
@@ -37,7 +37,7 @@ static class LegacyKeyAssignment
     private const string CodeImeOn = "CE";   // IME-オン
     private const string CodeImeOff = "CF";  // IME-オフ
     private const string CodeReconvert = "87"; // 再変換（変換キーの初期値）
-    private const string CodeKanaSwitch = "97"; // かな切替（無変換キーの初期値）
+    private const string CodeKanaSwitch = "97"; // かな切替（「無変換キー」の初期値）
     private const string CodeNone = "80";       // 割り当てなし（画面の「解除」で入る値）
 
     // 画面での変更のたびに MSIME\SerialNo が「起動からのミリ秒」で更新されていた（IME側が変更検知に使っている可能性）。

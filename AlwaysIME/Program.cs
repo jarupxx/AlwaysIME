@@ -437,7 +437,7 @@ class ResidentTest : Form
     static int SetSpaceMode;
     // MS-IME入力設定(レジストリ)
     const string MsImeRegistryPath = @"Software\Microsoft\IME\15.0\IMEJP\MSIME";
-    // 変換/無変換キーへのIMEオン・オフ割り当て: 変更前の値を保持して終了時に復元する
+    // 変換/「無変換キー」へのIMEオン・オフ割り当て: 変更前の値を保持して終了時に復元する
     static bool keyAssignmentRecorded = false;
     static int origKeyAssignment = -1; // -1 = 元々値が存在しなかった
     static readonly string[] keyPath = new string[2];
@@ -865,7 +865,7 @@ class ResidentTest : Form
         }
     }
 
-    // 変換キー→IME-ON / 無変換キー→IME-OFF の割り当てを有効化・無効化する
+    // 変換キー→IME-ON / 「無変換キー」→IME-OFF の割り当てを有効化・無効化する
     private static void ApplyKeyAssignment(bool enable)
     {
         if (ImeEnvironment.GetStatus() == ImeEnvironment.Status.CompatMode)
@@ -883,7 +883,7 @@ class ResidentTest : Form
         {
             ok = WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "IsKeyAssignmentEnabled", 1, RegistryValueKind.DWord);
             ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentHenkan", 0, RegistryValueKind.DWord);   // 変換キー → IME-ON
-            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentMuhenkan", 1, RegistryValueKind.DWord); // 無変換キー → IME-OFF
+            ok &= WriteRegistryValue(RegistryHive.CurrentUser, MsImeRegistryPath, "KeyAssignmentMuhenkan", 1, RegistryValueKind.DWord); // 「無変換キー」 → IME-OFF
         }
         else
         {
