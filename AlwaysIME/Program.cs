@@ -326,6 +326,9 @@ class ResidentTest : Form
     static bool noKeyInput = false;
     static string foregroundprocessName;
     private static string foregroundWindowTitle;
+    // デバッグ出力専用：直前に監視したフォアグラウンドウィンドウ（ウィンドウ遷移の判定に使う）
+    static IntPtr debugPreviousWindowHandle = IntPtr.Zero;
+    static string debugPreviousProcessName;
     static string RegistrationWindowTitle;
     internal static readonly string[][] List = new string[4][];
     internal const int PassArray = 0;
@@ -1811,6 +1814,30 @@ class ResidentTest : Form
         }
         return false;
     }
+    // デバッグ出力専用：直前のフォアグラウンドウィンドウと比べて、どう遷移したかを返す。呼ぶたびに「直前」を更新する
+    static string TrackForegroundWindow(IntPtr handle, string processName)
+    {
+        string result;
+        if (debugPreviousWindowHandle == IntPtr.Zero)
+        {
+            result = "初回";
+        }
+        else if (handle == debugPreviousWindowHandle)
+        {
+            result = "同じウィンドウ";
+        }
+        else if (string.Equals(processName, debugPreviousProcessName, StringComparison.OrdinalIgnoreCase))
+        {
+            result = $"同じアプリの別ウィンドウ(前:0x{debugPreviousWindowHandle.ToInt64():X})";
+        }
+        else
+        {
+            result = $"別のアプリへ移動(前:{debugPreviousProcessName} 0x{debugPreviousWindowHandle.ToInt64():X})";
+        }
+        debugPreviousWindowHandle = handle;
+        debugPreviousProcessName = processName;
+        return result;
+    }
     // 半角カナ/全角英数/カタカナ モードを強制的に「ひらがな」モードに変更する
     void MonitorActiveWindow()
     {
@@ -1859,6 +1886,8 @@ class ResidentTest : Form
                         Process process = Process.GetProcessById((int)processId);
                         // プロセス名を取得
                         foregroundprocessName = process.ProcessName;
+                        // 直前のウィンドウと比べた遷移（デバッグ出力用）
+                        string windowChange = TrackForegroundWindow(foregroundWindowHandle, foregroundprocessName);
                         // ウィンドウのタイトルを取得
                         const int nChars = 256;
                         StringBuilder titleBuilder = new StringBuilder(nChars);
@@ -1870,13 +1899,13 @@ class ResidentTest : Form
                                 RemoveUpdateTagRegex();
                                 Debug.WriteLine($"タイトルから更新タグを削除しました。");
                             }
-                            Debug.WriteLine($"タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+                            Debug.WriteLine($"タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName} ハンドル:0x{foregroundWindowHandle.ToInt64():X} 遷移:{windowChange}");
                         }
                         else
                         {
                             foregroundWindowTitle = "";
                             // ウィンドウタイトルやプロセス名はファイルログには出さない（デバッガー専用）
-                            Debug.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName}");
+                            Debug.WriteLine($"タイトルを取得できません。タイトル:{foregroundWindowTitle} プロセス名:{foregroundprocessName} ハンドル:0x{foregroundWindowHandle.ToInt64():X} 遷移:{windowChange}");
                             /* タイトルが空欄のプロセスが存在するので後でreturn;をする */
                             // return;
                         }
