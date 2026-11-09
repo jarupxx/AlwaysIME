@@ -1534,8 +1534,8 @@ class ResidentTest : Form
         {
             return;
         }
-        suspendFewMenuItem.Text = $"一時停止（{SuspendFewInterval}分）(&D)";
-        suspendMenuItem.Text = $"しばらく停止（{SuspendInterval}分）(&W)";
+        suspendFewMenuItem.Text = $"一時停止(&D)（{SuspendFewInterval}分）";
+        suspendMenuItem.Text = $"しばらく停止(&W)（{SuspendInterval}分）";
         resumeMenuItem.Text = "再開(&R)";
         bool suspended = IsSuspended;
         suspendFewMenuItem.Visible = !suspended;
